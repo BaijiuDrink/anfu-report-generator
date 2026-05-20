@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    runs-on: windows-latest   
+    runs-on: windows-latest
 
     steps:
     - name: Checkout code
@@ -17,16 +17,37 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.7'
+        python-version: '3.11'
         cache: 'pip'
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install black flake8
 
-    - name: Test run the main scripts
+    - name: Check code format with Black
+      run: black --check --diff . || echo "⚠️ Black 格式检查不通过"
+
+    - name: Lint code with Flake8
+      run: flake8 . --max-line-length=120 --extend-ignore=E501,E402 || echo "⚠️ Flake8 检查发现问题"
+
+    - name: Test import and basic run
+      env:
+        PYTHONIOENCODING: utf-8
+        PYTHONLEGACYWINDOWSSTDIO: 1
       run: |
-        python -c "import report_generator; print('report_generator 导入成功')"
-        python -c "import gui_app; print('gui_app 导入成功')"
-        echo "✅ 基本导入测试通过"
+        # 设置 UTF-8 编码
+        chcp 65001
+        
+        python -c "
+        import sys
+        sys.stdout.reconfigure(encoding='utf-8')
+        import report_generator
+        print('✅ report_generator 导入成功')
+        import gui_app
+        print('✅ gui_app 导入成功')
+        import vuln_manager
+        print('✅ vuln_manager 导入成功')
+        print('🎉 基本功能导入测试通过')
+        "
