@@ -30,10 +30,7 @@ jobs:
       run: black --check --diff . || echo "⚠️ Black 格式检查不通过（建议本地运行 black .）"
 
     - name: Lint code with Flake8
-      run: |
-        flake8 . --max-line-length=120 \
-                 --extend-ignore=E501,E402,E203,F401,F541 \
-                 || echo "⚠️ Flake8 检查发现警告（已放宽常见问题）"
+      run: flake8 . --max-line-length=120 --extend-ignore=E501,E402,E203,F401,F541 || echo "⚠️ Flake8 检查发现警告（已放宽）"
 
     - name: Test import and basic run
       env:
