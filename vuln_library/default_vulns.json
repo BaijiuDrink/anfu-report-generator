@@ -1,0 +1,594 @@
+{
+  "vulnerabilities": [
+    {
+      "id": "SQL-001",
+      "name": "SQL注入漏洞",
+      "risk_level": "高危",
+      "category": "注入类",
+      "description": "被测系统登录接口未对输入参数进行过滤，攻击者可通过注入恶意SQL语句，绕过身份认证获取后台管理权限，进而访问敏感数据。",
+      "verify_steps": "1. 在登录页面用户名输入框输入：admin' OR '1'='1\n2. 密码框输入任意字符\n3. 点击登录，使用BurpSuite拦截请求\n4. 将Payload替换为：admin'--\n5. 放行请求，成功绕过认证登录后台",
+      "verify_result": "成功绕过身份认证，获取后台管理员权限，可查看/修改所有用户数据",
+      "impact_scope": "涉及1台核心数据库服务器，约5万条用户数据面临泄露风险",
+      "fix_suggestion": "1. 使用参数化查询（Prepared Statement），从根本上杜绝SQL注入\n2. 对用户输入进行严格的类型校验和格式过滤（白名单机制）\n3. 遵循最小权限原则，数据库账户仅授予必要的操作权限\n4. 部署WAF（Web应用防火墙）进行应用层防护\n5. 屏蔽数据库详细的错误回显信息",
+      "fix_priority": "紧急",
+      "fix_verify": "使用原SQL注入Payload重新测试，确认返回401/403或参数被安全过滤，无数据泄露"
+    },
+    {
+      "id": "XSS-001",
+      "name": "存储型XSS漏洞",
+      "risk_level": "高危",
+      "category": "跨站脚本",
+      "description": "存储型跨站脚本漏洞是指攻击者将恶意脚本代码提交并存储在目标服务器（如数据库、日志、评论区）中，当其他用户访问包含该恶意代码的页面时，脚本在浏览器中执行。可导致用户Cookie窃取、会话劫持、钓鱼攻击等。",
+      "fix_suggestion": "1. 对所有用户输入数据进行服务端HTML实体编码后输出\n2. 使用CSP（Content Security Policy）策略限制脚本来源\n3. 设置HttpOnly和Secure标记保护敏感Cookie\n4. 对富文本内容使用白名单标签过滤机制\n5. 避免使用innerHTML、document.write等不安全的输出方式"
+    },
+    {
+      "id": "XSS-002",
+      "name": "反射型XSS漏洞",
+      "risk_level": "中危",
+      "category": "跨站脚本",
+      "description": "反射型跨站脚本漏洞是指恶意脚本通过URL参数等方式注入，服务器将未经过滤的输入直接返回到响应页面中执行。攻击者通常通过诱导用户点击恶意链接来触发，造成Cookie窃取、页面篡改等危害。",
+      "fix_suggestion": "1. 对URL参数等反射数据输出时进行HTML实体编码\n2. 设置CSP策略限制内联脚本执行\n3. 设置X-XSS-Protection响应头\n4. 对输入数据进行白名单校验"
+    },
+    {
+      "id": "FILE-001",
+      "name": "任意文件上传漏洞",
+      "risk_level": "高危",
+      "category": "文件操作",
+      "description": "任意文件上传漏洞是由于服务端未对用户上传的文件类型、内容、大小进行严格校验，攻击者可以上传WebShell等恶意脚本文件至服务器，从而获取服务器控制权限。常见于头像上传、附件上传等功能点。",
+      "fix_suggestion": "1. 采用白名单机制限制允许上传的文件扩展名（如jpg, png, pdf等）\n2. 对上传文件的MIME类型和文件头（Magic Header）进行双重校验\n3. 限制上传文件的大小\n4. 将上传目录设置为不可执行脚本\n5. 对上传文件重命名，使用随机字符串作为文件名\n6. 将上传文件存储在Web根目录之外"
+    },
+    {
+      "id": "CMD-001",
+      "name": "命令注入漏洞",
+      "risk_level": "高危",
+      "category": "注入类",
+      "description": "命令注入漏洞是指应用程序在调用系统命令时，拼接了未经校验的用户输入，导致攻击者可以通过构造特殊字符（如管道符|、分号;、反引号`等）执行任意系统命令，从而完全控制服务器。",
+      "fix_suggestion": "1. 避免在应用程序中直接调用系统命令，优先使用API替代\n2. 如必须调用，使用参数数组形式传参而非字符串拼接\n3. 对用户输入进行严格的白名单过滤，仅允许字母数字\n4. 使用沙箱/容器技术限制命令执行范围\n5. 对输入进行转义处理"
+    },
+    {
+      "id": "SSRF-001",
+      "name": "SSRF服务端请求伪造",
+      "risk_level": "高危",
+      "category": "请求伪造",
+      "description": "SSRF（Server-Side Request Forgery）漏洞是由于服务端对外部发起的请求中包含了用户可控的URL地址，攻击者可以利用该漏洞以服务器为跳板访问内部网络资源（如内网数据库、云服务元数据接口等），导致敏感信息泄露或内部系统被攻击。",
+      "fix_suggestion": "1. 使用白名单限制允许请求的目标地址和端口\n2. 禁用不需要的URL协议（如file://、gopher://、dict://等）\n3. 过滤内网IP段（127.0.0.0/8、10.0.0.0/8、172.16.0.0/12、192.168.0.0/16）\n4. 对DNS解析结果进行二次检查，防止DNS Rebinding攻击\n5. 使用独立的代理服务器转发外部请求"
+    },
+    {
+      "id": "AUTH-001",
+      "name": "越权访问漏洞",
+      "risk_level": "高危",
+      "category": "访问控制",
+      "description": "越权访问漏洞是指应用程序未能正确验证用户的资源访问权限，攻击者可以通过修改请求参数（如用户ID、订单号等）来访问或操作其他用户的资源。分为水平越权（同权限级别用户间数据访问）和垂直越权（低权限用户执行高权限操作）。",
+      "fix_suggestion": "1. 服务端必须校验当前用户对请求资源的访问权限\n2. 避免依赖客户端传入的标识符来判断权限，应使用会话信息\n3. 资源标识符使用UUID等不可预测的值\n4. 实现统一的权限校验中间件\n5. 对敏感操作进行二次身份验证"
+    },
+    {
+      "id": "INFO-001",
+      "name": "敏感信息泄露",
+      "risk_level": "中危",
+      "category": "信息泄露",
+      "description": "敏感信息泄露是指应用程序在响应页面、错误提示、文件等中暴露了系统敏感信息（如源码路径、数据库连接信息、服务器版本、内网IP地址等），攻击者可利用这些信息进行针对性的深入攻击。",
+      "fix_suggestion": "1. 关闭详细的错误回显，使用自定义的错误页面\n2. 禁止在生产环境开启Debug模式\n3. 删除或限制访问备份文件（.bak, .swp, .git等）\n4. 禁止目录浏览功能\n5. 敏感配置文件禁止对外访问\n6. 移除响应头中的Server、X-Powered-By等字段"
+    },
+    {
+      "id": "PASS-001",
+      "name": "弱口令漏洞",
+      "risk_level": "高危",
+      "category": "认证安全",
+      "description": "弱口令漏洞是指系统存在使用简单或常见密码的用户账户，攻击者可以通过暴力破解或字典攻击获取账户权限。常见弱口令包括admin/123456、root/root、admin/admin等组合。",
+      "fix_suggestion": "1. 强制实施密码复杂度策略（长度≥8位，包含大小写字母、数字、特殊字符）\n2. 实施账户锁定机制（连续失败N次后锁定账户）\n3. 添加图形验证码或多因素认证\n4. 对默认账户进行排查并强制修改默认密码\n5. 定期进行弱口令自查"
+    },
+    {
+      "id": "CSRF-001",
+      "name": "CSRF跨站请求伪造",
+      "risk_level": "中危",
+      "category": "请求伪造",
+      "description": "CSRF（Cross-Site Request Forgery）漏洞是指攻击者诱导用户在已登录目标站点的情况下，访问攻击者构造的恶意页面，该页面会自动向目标站点发送伪造的请求，以用户身份执行非预期的操作（如修改密码、转账等）。",
+      "fix_suggestion": "1. 在关键请求中添加CSRF Token并验证\n2. 校验Referer/Origin请求头\n3. 使用SameSite Cookie属性（设置为Lax或Strict）\n4. 关键操作要求二次确认或输入密码\n5. 避免使用GET请求执行状态变更操作"
+    },
+    {
+      "id": "DIR-001",
+      "name": "目录遍历漏洞",
+      "risk_level": "中危",
+      "category": "文件操作",
+      "description": "目录遍历漏洞（Path Traversal）是指应用程序未对文件路径参数进行有效过滤，攻击者可以通过构造类似../的路径跳转符，读取或下载服务器上的任意文件（如/etc/passwd、web.config等配置文件）。",
+      "fix_suggestion": "1. 对文件路径参数进行白名单校验或限制允许访问的目录范围\n2. 过滤或拒绝包含../、..\\等路径跳转字符的请求\n3. 使用文件ID映射而非直接传递文件路径\n4. 配置Web服务器禁止访问Web根目录之外的文件\n5. 使用chroot或容器技术隔离文件系统"
+    },
+    {
+      "id": "UNAUTH-001",
+      "name": "未授权访问漏洞",
+      "risk_level": "高危",
+      "category": "访问控制",
+      "description": "未授权访问漏洞是指系统某些功能页面或API接口未进行有效的身份认证或权限检查，攻击者无需登录即可直接访问后台管理界面、敏感数据接口或执行管理操作。常见于admin页面、API接口、中间件管理页面（如Redis、Jenkins等）暴露在公网。",
+      "fix_suggestion": "1. 对所有敏感页面和API接口添加身份认证校验\n2. 在统一入口（过滤器/中间件）处进行权限验证\n3. 管理后台不暴露在公网，或限制访问IP\n4. 中间件/数据库服务绑定内网地址\n5. 定期进行未授权访问自查"
+    },
+    {
+      "id": "READ-001",
+      "name": "任意文件读取漏洞",
+      "risk_level": "高危",
+      "category": "文件操作",
+      "description": "任意文件读取漏洞是指应用程序在读取文件时，未对用户传入的文件名或路径参数进行充分校验，攻击者可通过路径遍历或直接指定敏感文件路径来读取服务器上的任意文件，导致源码泄露、配置信息暴露等安全问题。",
+      "fix_suggestion": "1. 严格控制文件读取的范围，仅允许访问预设目录\n2. 使用白名单机制映射文件ID到实际文件路径\n3. 过滤路径中的特殊字符（../、..\\、%00等）\n4. 使用真实路径规范化后再进行校验\n5. 禁止用户直接控制文件路径参数"
+    },
+    {
+      "id": "DESER-001",
+      "name": "反序列化漏洞",
+      "risk_level": "高危",
+      "category": "注入类",
+      "description": "反序列化漏洞是指应用程序在反序列化不可信的数据时，攻击者通过构造恶意的序列化数据，在反序列化过程中触发代码执行。Java、PHP、Python等语言的反序列化漏洞均可导致远程代码执行（RCE），危害极大。",
+      "fix_suggestion": "1. 避免对不可信数据进行反序列化操作\n2. 使用安全的序列化格式（如JSON）替代原生序列化\n3. 对反序列化的类进行白名单校验\n4. 使用签名或加密机制确保序列化数据的完整性和来源可信\n5. 及时更新相关框架和库的版本"
+    },
+    {
+      "id": "NACOS-001",
+      "name": "NACOS derbySQL注入",
+      "risk_level": "高危",
+      "category": "注入类",
+      "description": "Nacos嵌入式数据库Derby存在SQL注入漏洞，影响版本≤1.4.1。漏洞位于/nacos/v1/cs/ops/derby接口，因缺少鉴权且仅校验SQL语句是否以\"select\"开头，导致攻击者可查询约20个默认表数据，包括users、permissions、roles、tenant_info等敏感信息。",
+      "verify_steps": "1. 访问/nacos/v1/cs/ops/derby接口\n2. 构造SQL查询语句：SELECT * FROM users\n3. 通过BurpSuite拦截请求并修改参数\n4. 执行查询获取数据库中的用户信息",
+      "verify_result": "成功查询到数据库中的用户表数据，包括用户名、密码等敏感信息",
+      "impact_scope": "影响Nacos 1.4.1及以下版本，可导致配置数据泄露、用户信息泄露",
+      "fix_suggestion": "1. 升级Nacos到1.4.2或2.0.0及以上版本\n2. 对/derby接口添加鉴权保护，添加@Secured注解\n3. 限制SQL查询范围，仅允许查询特定表和字段",
+      "fix_verify": "升级后访问/derby接口，确认返回401/403错误或需要认证"
+    },
+    {
+      "id": "NACOS-002",
+      "name": "Nacos权限绕过漏洞",
+      "risk_level": "高危",
+      "category": "访问控制",
+      "description": "Nacos在进行认证授权操作时，会判断请求的User-Agent是否为\"Nacos-Server\"，如果是则不进行任何认证。攻击者可修改User-Agent头绕过身份认证，获取敏感信息或执行未授权操作。",
+      "verify_steps": "1. 使用BurpSuite拦截请求\n2. 修改User-Agent为Nacos-Server\n3. 访问需要认证的接口",
+      "verify_result": "成功绕过认证访问管理接口，获取敏感配置信息",
+      "impact_scope": "影响Nacos 2.0.0-ALPHA.1以下版本",
+      "fix_suggestion": "1. 升级Nacos到最新版本\n2. 修复User-Agent判断逻辑，增加更严格的认证机制"
+      ,
+      "fix_verify": "修改User-Agent后无法访问受保护接口"
+    },
+    {
+      "id": "NACOS-003",
+      "name": "Alibaba Nacos 弱口令漏洞",
+      "risk_level": "高危",
+      "category": "认证安全",
+      "description": "Nacos默认账户存在弱口令nacos/nacos，攻击者可通过暴力破解或直接使用默认密码登录后台，获取系统管理权限。",
+      "fix_suggestion": "1. 立即修改默认密码，设置强密码策略（长度≥8位，包含大小写字母、数字、特殊字符）\n2. 启用双因素认证\n3. 限制登录失败次数，实施账户锁定机制"
+      
+    },
+    {
+      "id": "NACOS-004",
+      "name": "Nacos 跨站脚本漏洞",
+      "risk_level": "中危",
+      "category": "跨站脚本",
+      "description": "Nacos存在存储型或反射型XSS漏洞，攻击者可通过注入恶意脚本代码，当其他用户访问包含该代码的页面时，脚本在浏览器中执行，导致Cookie窃取、会话劫持等。",
+      "fix_suggestion": "1. 对所有用户输入数据进行HTML实体编码后输出\n2. 使用CSP策略限制脚本来源\n3. 设置HttpOnly和Secure标记保护敏感Cookie"
+      
+    },
+    {
+      "id": "NACOS-005",
+      "name": "Nacos token.secret.key 默认配置漏洞",
+      "risk_level": "高危",
+      "category": "配置安全",
+      "description": "Nacos默认配置文件中token.secret.key使用固定密钥，攻击者可利用该密钥伪造token，绕过身份认证获取系统权限。",
+      "fix_suggestion": "1. 修改默认的token.secret.key配置，使用随机生成的强密钥\n2. 定期更换密钥\n3. 将密钥存储在安全的配置中心"
+      
+    },
+    {
+      "id": "SWAGGER-001",
+      "name": "Swagger API未授权访问漏洞",
+      "risk_level": "中危",
+      "category": "访问控制",
+      "description": "Swagger API文档接口未进行身份认证，攻击者可直接访问API文档，了解系统接口信息，为后续攻击提供便利。",
+      "fix_suggestion": "1. 对Swagger接口添加身份认证和授权检查\n2. 在生产环境禁用Swagger文档访问或限制访问IP\n3. 使用独立的环境配置，开发环境开启，生产环境关闭"
+      
+    },
+    {
+      "id": "MONGODB-001",
+      "name": "MongoDB Zlib 压缩协议远程未授权堆内存泄露漏洞",
+      "risk_level": "高危",
+      "category": "内存泄露",
+      "description": "MongoDB Zlib压缩协议存在远程未授权堆内存泄露漏洞，攻击者可利用该漏洞导致服务崩溃或信息泄露。",
+      "fix_suggestion": "1. 升级MongoDB到修复版本\n2. 限制MongoDB服务的网络访问范围"
+      
+    },
+    {
+      "id": "HFS-001",
+      "name": "HFS2.3未经身份验证的远程代码执行",
+      "risk_level": "高危",
+      "category": "远程代码执行",
+      "description": "HFS 2.3版本存在未经身份验证的远程代码执行漏洞，攻击者可直接执行任意系统命令，完全控制服务器。",
+      "verify_steps": "1. 构造恶意HTTP请求\n2. 在URL参数中注入系统命令",
+      "verify_result": "成功执行系统命令，获取服务器控制权限",
+      "fix_suggestion": "1. 升级到最新版本的HFS\n2. 禁用不必要的功能模块"
+      
+    },
+    {
+      "id": "TOMCAT-001",
+      "name": "Apache Tomcat服务器文件包含漏洞",
+      "risk_level": "高危",
+      "category": "文件操作",
+      "description": "Apache Tomcat AJP协议存在文件包含漏洞(CVE-2020-1938)，攻击者可读取webapp目录下的任意文件，包括配置文件、源代码等。",
+      "fix_suggestion": "1. 升级Tomcat到修复版本（9.0.31、8.5.51、7.0.100及以上）\n2. 禁用AJP协议或配置访问控制"
+      
+    },
+    {
+      "id": "JBOSS-001",
+      "name": "JBoss未授权访问漏洞",
+      "risk_level": "高危",
+      "category": "访问控制",
+      "description": "JBoss管理控制台未进行身份认证，攻击者可直接访问管理界面，部署恶意应用或执行管理操作。",
+      "fix_suggestion": "1. 配置强密码认证机制\n2. 限制管理控制台的访问IP\n3. 修改默认端口"
+      
+    },
+    {
+      "id": "JBOSS-002",
+      "name": "JBoss status程序full参数敏感信息泄露",
+      "risk_level": "中危",
+      "category": "信息泄露",
+      "description": "JBoss status程序full参数可泄露系统敏感信息，包括内存使用情况、线程信息、部署应用等。",
+      "fix_suggestion": "1. 禁用或保护status接口访问\n2. 配置访问控制列表"
+      
+    },
+    {
+      "id": "SPRING-001",
+      "name": "SpringBoot Actuator 未授权访问漏洞",
+      "risk_level": "中危",
+      "category": "访问控制",
+      "description": "SpringBoot Actuator端点未进行身份认证，攻击者可访问/actuator/health、/actuator/env等端点，获取系统配置、环境变量等敏感信息。",
+      "fix_suggestion": "1. 配置management.endpoints.web.exposure.include限制暴露的端点\n2. 启用Spring Security保护Actuator端点"
+      
+    },
+    {
+      "id": "RDP-001",
+      "name": "Microsoft远程桌面协议RDP远程代码执行漏洞",
+      "risk_level": "高危",
+      "category": "远程代码执行",
+      "description": "Microsoft RDP协议存在远程代码执行漏洞，攻击者可利用该漏洞在目标系统上执行任意代码，完全控制系统。",
+      "fix_suggestion": "1. 安装最新的安全补丁（MS12-020）\n2. 限制RDP服务的网络访问范围"
+      
+    },
+    {
+      "id": "RDP-002",
+      "name": "Microsoft Remote Desktop Services 输入验证错误漏洞",
+      "risk_level": "高危",
+      "category": "远程代码执行",
+      "description": "Windows远程桌面服务存在输入验证错误漏洞（BlueKeep），攻击者可利用该漏洞执行远程代码，无需用户交互。",
+      "fix_suggestion": "1. 安装安全补丁（CVE-2019-0708）\n2. 启用网络级身份验证（NLA）"
+      
+    },
+    {
+      "id": "CONSUL-001",
+      "name": "Hashicorp Consul Web UI and API access",
+      "risk_level": "中危",
+      "category": "访问控制",
+      "description": "Consul Web UI和API接口未进行身份认证，攻击者可直接访问管理界面和API，获取服务注册信息或执行管理操作。",
+      "fix_suggestion": "1. 启用ACL访问控制列表\n2. 配置HTTPS加密通信"
+      
+    },
+    {
+      "id": "NTP-001",
+      "name": "NTP monlist Command Enabled DoS",
+      "risk_level": "中危",
+      "category": "拒绝服务",
+      "description": "NTP服务器启用monlist命令，攻击者可利用该命令发起反射放大攻击，导致目标服务器遭受DDoS攻击。",
+      "fix_suggestion": "1. 禁用monlist命令（restrict default noquery）\n2. 限制NTP查询来源"
+      
+    },
+    {
+      "id": "HTTP-001",
+      "name": "Microsoft Windows HTTP.sys 远程执行代码漏洞",
+      "risk_level": "高危",
+      "category": "远程代码执行",
+      "description": "Windows HTTP.sys组件存在远程代码执行漏洞，攻击者可通过构造特制的HTTP请求触发缓冲区溢出，执行任意代码。",
+      "fix_suggestion": "1. 安装安全补丁（MS15-034）\n2. 配置IIS请求过滤"
+      
+    },
+    {
+      "id": "ORACLE-001",
+      "name": "Oracle TNS Listener Remote Poisoning",
+      "risk_level": "高危",
+      "category": "中间人攻击",
+      "description": "Oracle TNS监听器存在远程投毒漏洞，攻击者可劫持数据库连接，窃取或篡改数据。",
+      "fix_suggestion": "1. 启用TNS加密和认证（SQLNET.ENCRYPTION_SERVER）\n2. 配置本地命名解析"
+      
+    },
+    {
+      "id": "VNC-001",
+      "name": "VNC Server Unauthenticated Access",
+      "risk_level": "高危",
+      "category": "访问控制",
+      "description": "VNC服务器未配置密码认证，攻击者可直接连接并控制远程桌面。",
+      "fix_suggestion": "1. 配置强密码认证机制"
+      
+    },
+    {
+      "id": "DRUID-001",
+      "name": "Alibaba Druid 未授权访问漏洞",
+      "risk_level": "中危",
+      "category": "访问控制",
+      "description": "Druid监控页面未进行身份认证，攻击者可直接访问监控页面，查看数据库连接池信息、SQL执行统计等敏感信息。",
+      "fix_suggestion": "1. 配置Druid监控页面的访问认证（druid.loginUsername、druid.loginPassword）\n2. 限制监控页面的访问IP"
+      
+    },
+    {
+      "id": "AIRFLOW-001",
+      "name": "Airflow未授权访问",
+      "risk_level": "高危",
+      "category": "访问控制",
+      "description": "Airflow Web UI未进行身份认证，攻击者可直接访问管理界面，查看或修改DAG任务配置。",
+      "fix_suggestion": "1. 启用Airflow认证机制（webserver_config.py配置）\n2. 配置RBAC权限控制"
+      
+    },
+    {
+      "id": "DOCKER-001",
+      "name": "Docker Remote API 未授权访问漏洞",
+      "risk_level": "高危",
+      "category": "访问控制",
+      "description": "Docker Remote API未进行身份认证，攻击者可直接访问API，创建容器、执行命令，完全控制Docker主机。",
+      "fix_suggestion": "1. 配置TLS证书认证（--tlsverify）\n2. 限制API访问来源"
+      
+    },
+    {
+      "id": "MSMQ-001",
+      "name": "Microsoft Message Queuing RCE",
+      "risk_level": "高危",
+      "category": "远程代码执行",
+      "description": "Microsoft Message Queuing存在远程代码执行漏洞，攻击者可利用该漏洞在目标系统上执行任意代码。",
+      "fix_suggestion": "1. 安装安全补丁（CVE-2023-21554）\n2. 限制MSMQ服务的网络访问"
+      
+    },
+    {
+      "id": "YONYOU-001",
+      "name": "用友ERP-NC 目录遍历漏洞",
+      "risk_level": "中危",
+      "category": "文件操作",
+      "description": "用友ERP-NC系统存在目录遍历漏洞，攻击者可通过构造../路径访问服务器上的任意文件。",
+      "fix_suggestion": "1. 对文件路径参数进行白名单校验"
+      
+    },
+    {
+      "id": "YONYOU-002",
+      "name": "用友portal接口任意文件读取漏洞",
+      "risk_level": "高危",
+      "category": "文件操作",
+      "description": "用友portal接口未对文件路径参数进行有效校验，攻击者可读取服务器上的任意文件，导致源码泄露、配置信息暴露。",
+      "fix_suggestion": "1. 严格控制文件读取范围"
+      
+    },
+    {
+      "id": "YONYOU-003",
+      "name": "用友NC U8 Cloud XXE漏洞",
+      "risk_level": "高危",
+      "category": "注入类",
+      "description": "用友NC U8 Cloud smartweb2.RPC.d接口存在XML外部实体注入漏洞，攻击者可读取服务器上的任意文件或发起SSRF攻击。",
+      "fix_suggestion": "1. 禁用XML解析器的外部实体解析功能"
+      
+    },
+    {
+      "id": "YONYOU-004",
+      "name": "用友NC saveDoc 任意文件上传",
+      "risk_level": "高危",
+      "category": "文件操作",
+      "description": "用友NC saveDoc接口未对上传文件类型进行严格校验，攻击者可上传WebShell等恶意脚本文件，获取服务器控制权限。",
+      "fix_suggestion": "1. 采用白名单机制限制文件扩展名\n2. 限制上传目录不可执行"
+      
+    },
+    {
+      "id": "YONYOU-005",
+      "name": "用友NC Cloud XXE漏洞",
+      "risk_level": "高危",
+      "category": "注入类",
+      "description": "用友NC Cloud soapFormat.ajax接口存在XML外部实体注入漏洞，攻击者可利用该漏洞读取敏感文件或发起SSRF攻击。",
+      "fix_suggestion": "1. 禁用XML外部实体解析"
+      
+    },
+    {
+      "id": "YONYOU-006",
+      "name": "用友U8 Cloud XXE读取文件",
+      "risk_level": "高危",
+      "category": "注入类",
+      "description": "用友U8 Cloud smartweb2.showRPCLoadingTip.d接口存在XXE漏洞，攻击者可读取服务器上的任意文件。",
+      "fix_suggestion": "1. 禁用外部实体解析"
+    },
+    {
+      "id": "YONYOU-007",
+      "name": "用友Ufida任意文件读取漏洞",
+      "risk_level": "高危",
+      "category": "文件操作",
+      "description": "用友Ufida-ELTextFile.load.d接口存在任意文件读取漏洞，攻击者可读取服务器上的敏感文件。",
+      "fix_suggestion": "1. 严格控制文件读取范围"
+      
+    },
+    {
+      "id": "EISOO-001",
+      "name": "爱数AnyShare start_service 远程命令执行",
+      "risk_level": "高危",
+      "category": "远程代码执行",
+      "description": "爱数AnyShare智能内容管理平台start_service接口存在远程命令执行漏洞，攻击者可执行任意系统命令。",
+      "fix_suggestion": "1. 升级到修复版本"
+      
+    },
+    {
+      "id": "EISOO-002",
+      "name": "爱数AnyShare stop_service 远程命令执行",
+      "risk_level": "高危",
+      "category": "远程代码执行",
+      "description": "爱数AnyShare智能内容管理平台stop_service接口存在远程命令执行漏洞，攻击者可执行任意系统命令。",
+      "fix_suggestion": "1. 升级到修复版本"
+      
+    },
+    {
+      "id": "EISOO-003",
+      "name": "爱数AnyShare信息泄露漏洞",
+      "risk_level": "中危",
+      "category": "信息泄露",
+      "description": "爱数AnyShare智能内容管理平台Usrm_GetAllUsers接口未进行权限校验，攻击者可获取所有用户信息。",
+      "fix_suggestion": "1. 添加身份认证和权限校验"
+      
+    },
+    {
+      "id": "ELASTIC-001",
+      "name": "Elasticsearch 未授权访问",
+      "risk_level": "高危",
+      "category": "访问控制",
+      "description": "Elasticsearch未配置身份认证，攻击者可直接访问9200端口，执行任意查询或修改索引数据。",
+      "fix_suggestion": "1. 启用X-Pack安全模块"
+      
+    },
+    {
+      "id": "MQTT-001",
+      "name": "MQTT未授权访问",
+      "risk_level": "中危",
+      "category": "访问控制",
+      "description": "MQTT Broker未配置身份认证，攻击者可直接连接并发布/订阅消息，窃取或篡改数据。",
+      "fix_suggestion": "1. 配置用户名密码认证"
+      
+    },
+    {
+      "id": "MONGODB-002",
+      "name": "Mongodb未授权访问漏洞",
+      "risk_level": "高危",
+      "category": "访问控制",
+      "description": "MongoDB未配置身份认证，攻击者可直接访问数据库，读取或修改数据。",
+      "fix_suggestion": "1. 启用身份认证（--auth）\n2. 配置访问控制列表"
+      
+    },
+    {
+      "id": "LDAP-001",
+      "name": "LDAP未授权访问",
+      "risk_level": "高危",
+      "category": "访问控制",
+      "description": "LDAP服务器未配置身份认证，攻击者可直接查询目录信息，获取用户账户、组织结构等敏感信息。",
+      "fix_suggestion": "1. 配置LDAP认证机制"
+      
+    },
+    {
+      "id": "ZOHO-001",
+      "name": "ZOHO ManageEngine OpManager 信息泄露漏洞",
+      "risk_level": "中危",
+      "category": "信息泄露",
+      "description": "ZOHO ManageEngine OpManager存在信息泄露漏洞，攻击者可获取系统敏感信息。",
+      "fix_suggestion": "1. 升级到修复版本"
+      
+    },
+    {
+      "id": "FINE-001",
+      "name": "帆软报表任意文件读取漏洞",
+      "risk_level": "高危",
+      "category": "文件操作",
+      "description": "帆软报表系统存在任意文件读取漏洞，攻击者可读取服务器上的任意文件。",
+      "fix_suggestion": "1. 严格控制文件读取范围"
+      
+    },
+    {
+      "id": "SUNLOGIN-001",
+      "name": "向日葵远程控制软件远程命令执行漏洞",
+      "risk_level": "高危",
+      "category": "远程代码执行",
+      "description": "向日葵远程控制软件存在远程命令执行漏洞，攻击者可执行任意系统命令。",
+      "fix_suggestion": "1. 升级到修复版本"
+      
+    },
+    {
+      "id": "INFLUXDB-001",
+      "name": "Influxdata InfluxDB 授权问题漏洞",
+      "risk_level": "中危",
+      "category": "访问控制",
+      "description": "InfluxDB存在授权问题漏洞，攻击者可绕过身份认证访问数据库。",
+      "fix_suggestion": "1. 升级到修复版本"
+      
+    },
+    {
+      "id": "IIS-001",
+      "name": "IIS短文件名枚举漏洞",
+      "risk_level": "低危",
+      "category": "信息泄露",
+      "description": "IIS服务器存在短文件名枚举漏洞，攻击者可枚举服务器上的文件和目录名。",
+      "fix_suggestion": "1. 禁用8.3文件名格式（fsutil behavior set disable8dot3）"
+      
+    },
+    {
+      "id": "NGINX-001",
+      "name": "Nginx Vhost Traffic Status未授权访问漏洞",
+      "risk_level": "中危",
+      "category": "访问控制",
+      "description": "Nginx Vhost Traffic Status模块未进行身份认证，攻击者可直接访问流量统计页面，获取服务器访问信息。",
+      "fix_suggestion": "1. 配置访问控制（allow/deny）"
+      
+    },
+    {
+      "id": "ZOOKEEPER-001",
+      "name": "ZooKeeper 未授权访问",
+      "risk_level": "高危",
+      "category": "访问控制",
+      "description": "ZooKeeper未配置身份认证，攻击者可直接连接并查看/修改节点数据。",
+      "fix_suggestion": "1. 配置SASL认证"
+      
+    },
+    {
+      "id": "NTP-002",
+      "name": "NTP服务器支持NTP Mode 6 查询",
+      "risk_level": "中危",
+      "category": "信息泄露",
+      "description": "NTP服务器支持Mode 6查询，攻击者可获取服务器配置信息和统计信息。",
+      "fix_suggestion": "1. 禁用Mode 6查询（restrict default noquery）"
+      
+    },
+    {
+      "id": "FINE-002",
+      "name": "帆软FineReport ReportSever 目录遍历漏洞",
+      "risk_level": "中危",
+      "category": "文件操作",
+      "description": "帆软FineReport ReportSever存在目录遍历漏洞，攻击者可访问服务器上的任意文件。",
+      "fix_suggestion": "1. 对文件路径参数进行白名单校验"
+      
+    },
+    {
+      "id": "RPC-001",
+      "name": "目标主机rpcinfo -p信息泄露",
+      "risk_level": "低危",
+      "category": "信息泄露",
+      "description": "目标主机的RPC服务未限制访问，攻击者可通过rpcinfo -p命令获取RPC服务信息。",
+      "fix_suggestion": "1. 配置RPC服务访问控制"
+      
+    },
+    {
+      "id": "RDP-003",
+      "name": "Microsoft Windows远程桌面协议服务程序密钥泄露漏洞",
+      "risk_level": "中危",
+      "category": "信息泄露",
+      "description": "Windows RDP服务存在密钥泄露漏洞，攻击者可获取会话密钥。",
+      "fix_suggestion": "1. 安装安全补丁"
+      
+    },
+    {
+      "id": "FTP-001",
+      "name": "远程主机允许匿名FTP登录",
+      "risk_level": "中危",
+      "category": "访问控制",
+      "description": "FTP服务器允许匿名登录，攻击者可访问公开目录中的文件。",
+      "fix_suggestion": "1. 禁用匿名登录"
+    },
+    {
+      "id": "SSH-001",
+      "name": "SSH 弱口令",
+      "risk_level": "高危",
+      "category": "认证安全",
+      "description": "SSH服务存在弱口令账户，攻击者可通过暴力破解获取登录权限。",
+      "fix_suggestion": "1. 强制实施密码复杂度策略"
+      
+    },
+    {
+      "id": "NGINX-002",
+      "name": "nginx-module-vts-xss",
+      "risk_level": "中危",
+      "category": "跨站脚本",
+      "description": "nginx-module-vts模块存在XSS漏洞，攻击者可注入恶意脚本代码。",
+      "fix_suggestion": "1. 升级到修复版本"
+    },
+    {
+      "id": "RABBITMQ-001",
+      "name": "RabbitMQ rabbitmqadmin Leak",
+      "risk_level": "中危",
+      "category": "信息泄露",
+      "description": "RabbitMQ rabbitmqadmin管理界面存在信息泄露漏洞，攻击者可获取管理信息。",
+      "fix_suggestion": "1. 配置访问控制"
+    }
+  ]
+}
