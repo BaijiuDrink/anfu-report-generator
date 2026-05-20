@@ -12,7 +12,7 @@ import ctypes
 import json
 import datetime
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog, simpledialog
+from tkinter import ttk, messagebox, filedialog
 from PIL import ImageGrab, Image, ImageTk
 import win32clipboard
 
@@ -21,7 +21,6 @@ sys.path.insert(0, BASE_DIR)
 
 from vuln_manager import (
     VulnManager,
-    RISK_LEVELS,
     FIX_PRIORITIES,
     NETWORK_ZONES,
     batch_create_findings,
@@ -535,7 +534,7 @@ class PentestReportApp:
         )
         last_end = 0
         for m in pattern.finditer(content):
-            text_before = content[last_end : m.start()]
+            text_before = content[last_end: m.start()]
             if text_before:
                 text_widget.insert(tk.INSERT, text_before)
             rel_path = m.group(1)
@@ -837,7 +836,7 @@ class PentestReportApp:
         if header_end < 0:
             header_end = full_html.find("\r\n\r\n<HTML")
         if header_end >= 0:
-            full_html = full_html[header_end + 4 :]
+            full_html = full_html[header_end + 4:]
             header_len = header_end + 4
         else:
             header_len = 0
@@ -866,7 +865,7 @@ class PentestReportApp:
                     raw_path = src
                     for prefix in ("file:///", "file://", "file:"):
                         if raw_path.lower().startswith(prefix):
-                            raw_path = raw_path[len(prefix) :]
+                            raw_path = raw_path[len(prefix):]
                             break
                     raw_path = raw_path.replace("/", "\\")
                     from urllib.parse import unquote

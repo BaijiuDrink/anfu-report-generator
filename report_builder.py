@@ -3,7 +3,7 @@ import datetime
 from docx import Document
 from docx.shared import Inches, Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml.ns import qn, nsdecls
+from docx.oxml.ns import nsdecls
 from docx.oxml import parse_xml
 from PIL import Image
 
@@ -423,7 +423,7 @@ class ReportBuilder:
                     _add_image_to_doc(self.document, full_path)
 
             _add_body_text(
-                self.document, f"验证步骤（含Payload、操作流程）：见上方截图及描述"
+                self.document, "验证步骤（含Payload、操作流程）：见上方截图及描述"
             )
         else:
             _add_body_text(
