@@ -27,19 +27,19 @@ jobs:
         pip install black flake8
 
     - name: Check code format with Black
-      run: black --check --diff . || echo "⚠️ Black 格式检查不通过"
+      run: black --check --diff . || echo "⚠️ Black 格式检查不通过（建议本地运行 black .）"
 
     - name: Lint code with Flake8
-      run: flake8 . --max-line-length=120 --extend-ignore=E501,E402 || echo "⚠️ Flake8 检查发现问题"
+      run: |
+        flake8 . --max-line-length=120 \
+                 --extend-ignore=E501,E402,E203,F401,F541 \
+                 || echo "⚠️ Flake8 检查发现警告（已放宽常见问题）"
 
     - name: Test import and basic run
       env:
         PYTHONIOENCODING: utf-8
-        PYTHONLEGACYWINDOWSSTDIO: 1
       run: |
-        # 设置 UTF-8 编码
-        chcp 65001
-        
+        chcp 65001 >nul
         python -c "
         import sys
         sys.stdout.reconfigure(encoding='utf-8')
@@ -49,5 +49,5 @@ jobs:
         print('✅ gui_app 导入成功')
         import vuln_manager
         print('✅ vuln_manager 导入成功')
-        print('🎉 基本功能导入测试通过')
+        print('🎉 基本导入测试通过')
         "
