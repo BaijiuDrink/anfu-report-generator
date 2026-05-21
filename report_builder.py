@@ -1,4 +1,5 @@
 import os
+import re
 import datetime
 from docx import Document
 from docx.shared import Inches, Pt, Cm, RGBColor
@@ -6,6 +7,19 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import nsdecls
 from docx.oxml import parse_xml
 from PIL import Image
+
+_XML_INVALID_CHARS = re.compile(
+    "[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f\ud800-\udfff\ufdd0-\ufdef\ufffe-\uffff]"
+)
+
+
+def _sanitize(text):
+    if text is None:
+        return ""
+    if not isinstance(text, str):
+        text = str(text)
+    return _XML_INVALID_CHARS.sub("", text)
+
 
 RISK_COLORS = {
     "严重": RGBColor(139, 0, 0),
@@ -27,7 +41,7 @@ ZONE_COLORS = {
 
 
 def _add_run(paragraph, text, bold=False, size=None, color=None, font_name=FONT_NAME):
-    run = paragraph.add_run(text)
+    run = paragraph.add_run(_sanitize(text))
     run.bold = bold
     if size:
         run.font.size = Pt(size)
@@ -187,7 +201,7 @@ def _add_separator(doc):
 class ReportBuilder:
     def __init__(self, project_name="渗透测试报告"):
         self.document = Document()
-        self.project_name = project_name
+        self.project_name = _sanitize(project_name)
         self._setup_page()
         self._add_cover()
 
