@@ -27,10 +27,10 @@ jobs:
         pip install black flake8
 
     - name: Check code format with Black
-      run: black --check --diff . || echo "⚠️ Black 格式检查不通过（建议本地运行 black .）"
+      run: black --check --diff .
 
     - name: Lint code with Flake8
-      run: flake8 . --max-line-length=120 --extend-ignore=E501,E402,E203,F401,F541 || echo "⚠️ Flake8 检查发现警告（已放宽）"
+      run: flake8 . --max-line-length=120 --extend-ignore=E501,E402,E203,F401,F541
 
     - name: Test import and basic run
       env:

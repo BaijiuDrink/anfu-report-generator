@@ -66,7 +66,14 @@ class VulnManager:
         return vuln
 
     def update(self, vuln_id, updates):
-        v = self.get_by_id(vuln_id)
+        v = next(
+            (
+                item
+                for item in self.data.get("vulnerabilities", [])
+                if item.get("id") == vuln_id
+            ),
+            None,
+        )
         if not v:
             raise ValueError(f"漏洞ID [{vuln_id}] 不存在")
         allowed_fields = [
@@ -76,6 +83,7 @@ class VulnManager:
             "description",
             "verify_steps",
             "verify_result",
+            "impact_scope",
             "fix_suggestion",
             "fix_priority",
             "fix_verify",

@@ -9,15 +9,25 @@ import re
 import base64
 import html as html_mod
 import ctypes
+import copy
 import json
 import datetime
+import shutil
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from PIL import ImageGrab, Image, ImageTk
 import win32clipboard
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, BASE_DIR)
+RESOURCE_DIR = getattr(sys, "_MEIPASS", BASE_DIR)
+DATA_DIR = (
+    os.path.join(
+        os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "AnfuReportGenerator"
+    )
+    if getattr(sys, "frozen", False)
+    else BASE_DIR
+)
+sys.path.insert(0, RESOURCE_DIR)
 
 from vuln_manager import (
     VulnManager,
@@ -27,8 +37,11 @@ from vuln_manager import (
 )
 from report_builder import ReportBuilder
 
-DEFAULT_LIBRARY = os.path.join(BASE_DIR, "vuln_library", "default_vulns.json")
-DEFAULT_OUTPUT_DIR = os.path.join(BASE_DIR, "output")
+DEFAULT_LIBRARY = os.path.join(DATA_DIR, "vuln_library", "default_vulns.json")
+DEFAULT_OUTPUT_DIR = os.path.join(DATA_DIR, "output")
+SCREENSHOT_PATTERN = re.compile(
+    r"\[截图:\s*([^\]]+\.(?:png|jpg|jpeg|gif|bmp))\]", re.IGNORECASE
+)
 
 RISK_LEVELS_SHORT = ["严重", "高危", "中危", "低危", "信息"]
 
@@ -40,17 +53,29 @@ class PentestReportApp:
         self.root.geometry("1280x820")
         self.root.minsize(1100, 700)
 
+        self._prepare_data_dirs()
         self.vuln_manager = VulnManager(DEFAULT_LIBRARY)
         self.findings = []
         self.current_edit_idx = -1
 
-        self.screenshots_dir = os.path.join(BASE_DIR, "screenshots")
+        self.screenshots_dir = os.path.join(DATA_DIR, "screenshots")
         os.makedirs(self.screenshots_dir, exist_ok=True)
         self._paste_images = []
 
         self._setup_styles()
         self._build_ui()
         self._refresh_library_list()
+
+    @staticmethod
+    def _prepare_data_dirs():
+        os.makedirs(DEFAULT_OUTPUT_DIR, exist_ok=True)
+        library_dir = os.path.dirname(DEFAULT_LIBRARY)
+        os.makedirs(library_dir, exist_ok=True)
+        bundled_library = os.path.join(
+            RESOURCE_DIR, "vuln_library", "default_vulns.json"
+        )
+        if not os.path.exists(DEFAULT_LIBRARY) and os.path.exists(bundled_library):
+            shutil.copy2(bundled_library, DEFAULT_LIBRARY)
 
     def _setup_styles(self):
         style = ttk.Style()
@@ -488,6 +513,7 @@ class PentestReportApp:
             self.editor_fix_verify,
         ]:
             w.delete("1.0", tk.END)
+        self._paste_images.clear()
 
     def _get_editor_data(self):
         return {
@@ -519,30 +545,27 @@ class PentestReportApp:
             self.editor_fix_suggestion: finding.get("fix_suggestion", ""),
             self.editor_fix_verify: finding.get("fix_verify", ""),
         }
-        for w, val in texts.items():
+        for w in texts:
             w.delete("1.0", tk.END)
+        self._paste_images.clear()
+        for w, val in texts.items():
             if w is self.editor_verify_steps:
                 self._insert_with_images(w, val)
             else:
                 w.insert("1.0", val)
 
     def _insert_with_images(self, text_widget, content):
-        import re
-
-        pattern = re.compile(
-            r"\[截图:\s*(screenshots/[^\]]+\.(?:png|jpg|jpeg|gif|bmp))\]", re.IGNORECASE
-        )
         last_end = 0
-        for m in pattern.finditer(content):
+        for m in SCREENSHOT_PATTERN.finditer(content):
             text_before = content[last_end : m.start()]
             if text_before:
                 text_widget.insert(tk.INSERT, text_before)
-            rel_path = m.group(1)
-            filepath = os.path.join(BASE_DIR, rel_path)
+            image_path = m.group(1)
+            filepath = self._resolve_screenshot_path(image_path)
             if os.path.exists(filepath):
                 try:
-                    img = Image.open(filepath)
-                    photo = ImageTk.PhotoImage(img)
+                    with Image.open(filepath) as image:
+                        photo = self._create_preview_photo(image)
                     self._paste_images.append(photo)
                     text_widget.insert(tk.INSERT, "\n")
                     text_widget.image_create(tk.INSERT, image=photo)
@@ -554,6 +577,25 @@ class PentestReportApp:
         remaining = content[last_end:]
         if remaining:
             text_widget.insert(tk.INSERT, remaining)
+
+    @staticmethod
+    def _resolve_screenshot_path(image_path, base_dir=None):
+        if os.path.isabs(image_path):
+            return image_path
+        candidates = [
+            os.path.join(base_dir, image_path) if base_dir else "",
+            os.path.join(DATA_DIR, image_path),
+            os.path.join(BASE_DIR, image_path),
+        ]
+        return next(
+            (path for path in candidates if path and os.path.exists(path)), image_path
+        )
+
+    @staticmethod
+    def _create_preview_photo(image, max_size=(1000, 700)):
+        preview = image.copy()
+        preview.thumbnail(max_size, Image.Resampling.LANCZOS)
+        return ImageTk.PhotoImage(preview)
 
     def _save_current_finding(self):
         data = self._get_editor_data()
@@ -751,9 +793,9 @@ class PentestReportApp:
         rcl = struct.unpack_from("<iiii", emf_data, 24)
         frame_w = max(rcl[2] - rcl[0], 1)
         frame_h = max(rcl[3] - rcl[1], 1)
-        w_native = max(int(frame_w * 96 / 2540), 1)
-        h_native = max(int(frame_h * 96 / 2540), 1)
-        scale = min(1800 / w_native, 1800 / h_native, 3)
+        w_native = max(int(frame_w * 300 / 2540), 1)
+        h_native = max(int(frame_h * 300 / 2540), 1)
+        scale = min(6000 / w_native, 6000 / h_native, 1)
         w = max(int(w_native * scale), 1)
         h = max(int(h_native * scale), 1)
 
@@ -818,48 +860,123 @@ class PentestReportApp:
             gdi32.DeleteDC(hdc)
         return None
 
+    @staticmethod
+    def _copy_image(image):
+        image.load()
+        return image.copy()
+
+    def _decode_encoded_image(self, data):
+        try:
+            return self._copy_image(Image.open(io.BytesIO(data)))
+        except Exception:
+            return None
+
+    def _decode_dib_image(self, data):
+        if not data or len(data) < 20:
+            return None
+        try:
+            dib_size = struct.unpack_from("<I", data, 0)[0]
+            if dib_size < 12 or dib_size > len(data):
+                return None
+
+            if dib_size >= 40:
+                bit_count = struct.unpack_from("<H", data, 14)[0]
+                compression = struct.unpack_from("<I", data, 16)[0]
+                colors_used = struct.unpack_from("<I", data, 32)[0]
+                palette_entries = colors_used or (
+                    1 << bit_count if bit_count <= 8 else 0
+                )
+                masks_size = 12 if dib_size == 40 and compression in (3, 6) else 0
+                pixel_offset = 14 + dib_size + masks_size + palette_entries * 4
+            else:
+                bit_count = struct.unpack_from("<H", data, 10)[0]
+                palette_entries = 1 << bit_count if bit_count <= 8 else 0
+                pixel_offset = 14 + dib_size + palette_entries * 3
+
+            bmp_header = struct.pack(
+                "<2sIHHI", b"BM", 14 + len(data), 0, 0, pixel_offset
+            )
+            return self._decode_encoded_image(bmp_header + data)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _image_quality_score(image):
+        return image.width * image.height
+
+    @staticmethod
+    def _image_signature(image):
+        thumbnail = image.convert("RGB")
+        thumbnail.thumbnail((32, 32), Image.Resampling.LANCZOS)
+        return image.size, hash(thumbnail.tobytes())
+
+    def _prefer_best_images(self, segments, candidates):
+        image_indexes = [
+            index
+            for index, item in enumerate(segments)
+            if isinstance(item, Image.Image)
+        ]
+        if not image_indexes or not candidates:
+            return segments
+
+        unique_candidates = {}
+        for candidate in candidates:
+            signature = self._image_signature(candidate)
+            current = unique_candidates.get(signature)
+            if current is None or self._image_quality_score(
+                candidate
+            ) > self._image_quality_score(current):
+                unique_candidates[signature] = candidate
+        candidates = list(unique_candidates.values())
+
+        if len(image_indexes) == 1:
+            candidates = [max(candidates, key=self._image_quality_score)]
+        elif len(candidates) != len(image_indexes):
+            return segments
+
+        unused = list(candidates)
+        for index in image_indexes:
+            current = segments[index]
+            current_ratio = current.width / current.height
+            best = min(
+                unused,
+                key=lambda image: abs(image.width / image.height - current_ratio),
+            )
+            ratio_diff = abs(best.width / best.height - current_ratio) / current_ratio
+            if ratio_diff <= 0.02 and self._image_quality_score(
+                best
+            ) > self._image_quality_score(current):
+                segments[index] = best
+            unused.remove(best)
+        return segments
+
     def _parse_html_clipboard(self, html_bytes):
         """从 Word HTML 剪贴板格式中提取文本和独立图片，保持图文顺序"""
         segments = []
 
+        if isinstance(html_bytes, str):
+            html_bytes = html_bytes.encode("utf-8")
         try:
-            full_html = html_bytes.decode("utf-8", errors="ignore")
-        except Exception:
-            return segments
-
-        # 解析 CF_HTML 头部偏移量（偏移从整个数据的第一个字节算起）
-        m_frag_start = re.search(r"StartFragment:(\d+)", full_html)
-        m_frag_end = re.search(r"EndFragment:(\d+)", full_html)
-
-        # 切掉头部 Version:...\r\n\r\n<html 之前的内容
-        header_end = full_html.find("\r\n\r\n<html")
-        if header_end < 0:
-            header_end = full_html.find("\r\n\r\n<HTML")
-        if header_end >= 0:
-            full_html = full_html[header_end + 4 :]
-            header_len = header_end + 4
-        else:
-            header_len = 0
-
-        fragment_str = full_html
-        if m_frag_start and m_frag_end:
-            try:
+            header = html_bytes[: min(len(html_bytes), 4096)]
+            m_frag_start = re.search(rb"StartFragment:(\d+)", header)
+            m_frag_end = re.search(rb"EndFragment:(\d+)", header)
+            fragment_bytes = html_bytes
+            if m_frag_start and m_frag_end:
                 fs = int(m_frag_start.group(1))
                 fe = int(m_frag_end.group(1))
-                fs_adj = fs - header_len
-                fe_adj = fe - header_len
-                if 0 <= fs_adj < fe_adj <= len(full_html):
-                    fragment_str = full_html[fs_adj:fe_adj]
-            except ValueError:
-                pass
+                if 0 <= fs < fe <= len(html_bytes):
+                    fragment_bytes = html_bytes[fs:fe]
+            fragment_str = fragment_bytes.decode("utf-8", errors="ignore")
+        except Exception:
+            return segments
 
         def _img_src_to_image(src):
             try:
                 if src.startswith("data:image"):
                     b64_match = re.search(r"base64,([^\s]+)", src)
                     if b64_match:
-                        return Image.open(
-                            io.BytesIO(base64.b64decode(b64_match.group(1)))
+                        return self._decode_encoded_image(
+                            base64.b64decode(b64_match.group(1))
                         )
                 elif src.startswith("file://"):
                     raw_path = src
@@ -872,7 +989,8 @@ class PentestReportApp:
 
                     raw_path = unquote(raw_path)
                     if os.path.exists(raw_path):
-                        return Image.open(raw_path)
+                        with Image.open(raw_path) as image:
+                            return self._copy_image(image)
             except Exception:
                 pass
             return None
@@ -916,12 +1034,18 @@ class PentestReportApp:
 
     def _read_clipboard(self):
         segments = []
-        seen_hashes = set()
-        fallback_images = []
+        image_candidates = []
 
         grabbed = ImageGrab.grabclipboard()
-        if grabbed is not None:
-            fallback_images.append(grabbed)
+        if isinstance(grabbed, Image.Image):
+            image_candidates.append(self._copy_image(grabbed))
+        elif isinstance(grabbed, list):
+            for path in grabbed:
+                try:
+                    with Image.open(path) as image:
+                        image_candidates.append(self._copy_image(image))
+                except Exception:
+                    pass
 
         try:
             win32clipboard.OpenClipboard()
@@ -943,36 +1067,39 @@ class PentestReportApp:
                         continue
 
                     if fmt == 14:  # CF_ENHMETAFILE (fallback)
-                        if not segments:
-                            try:
-                                data = win32clipboard.GetClipboardData(fmt)
-                                if data and len(data) > 52:
-                                    h = hash(data[:4096])
-                                    if h not in seen_hashes:
-                                        seen_hashes.add(h)
-                                        fallback_images.append(data)
-                            except Exception:
-                                pass
+                        try:
+                            data = win32clipboard.GetClipboardData(fmt)
+                            if data and len(data) > 52:
+                                image = self._emf_to_image(data)
+                                if image is not None:
+                                    image_candidates.append(image)
+                        except Exception:
+                            pass
                         continue
 
-                    if fmt not in (8, 2):
+                    try:
+                        fmt_name = win32clipboard.GetClipboardFormatName(fmt).lower()
+                    except Exception:
+                        fmt_name = ""
+
+                    if fmt_name in ("png", "image/png"):
+                        try:
+                            image = self._decode_encoded_image(
+                                win32clipboard.GetClipboardData(fmt)
+                            )
+                            if image is not None:
+                                image_candidates.append(image)
+                        except Exception:
+                            pass
+                        continue
+
+                    if fmt not in (8, 17):  # CF_DIB / CF_DIBV5
                         continue
                     try:
                         data = win32clipboard.GetClipboardData(fmt)
-                        if not data or len(data) < 4:
-                            continue
-                        dib_size = struct.unpack_from("<I", data, 0)[0]
-                        if dib_size <= 0 or dib_size > len(data):
-                            continue
-                        bmp_header = struct.pack(
-                            "<2sIHHI", b"BM", 14 + len(data), 0, 0, 14 + dib_size
-                        )
-                        full_data = bmp_header + data
-                        h = hash(full_data[:4096])
-                        if h in seen_hashes:
-                            continue
-                        seen_hashes.add(h)
-                        fallback_images.append(Image.open(io.BytesIO(full_data)))
+                        image = self._decode_dib_image(data)
+                        if image is not None:
+                            image_candidates.append(image)
                     except Exception:
                         continue
 
@@ -992,14 +1119,10 @@ class PentestReportApp:
         except Exception:
             pass
 
-        if not segments:
-            for item in fallback_images:
-                if isinstance(item, Image.Image):
-                    segments.append(item)
-                elif isinstance(item, bytes):
-                    img = self._emf_to_image(item)
-                    if img is not None:
-                        segments.append(img)
+        if segments:
+            return self._prefer_best_images(segments, image_candidates)
+        if image_candidates:
+            segments.append(max(image_candidates, key=self._image_quality_score))
 
         return segments
 
@@ -1013,17 +1136,16 @@ class PentestReportApp:
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
                 filename = f"paste_{timestamp}.png"
                 filepath = os.path.join(self.screenshots_dir, filename)
-                rel_path = os.path.join("screenshots", filename)
 
                 item.save(filepath, "PNG")
 
-                photo = ImageTk.PhotoImage(item)
+                photo = self._create_preview_photo(item)
                 self._paste_images.append(photo)
 
                 text_widget.insert(tk.INSERT, "\n")
                 text_widget.image_create(tk.INSERT, image=photo)
                 text_widget.insert(tk.INSERT, "\n")
-                text_widget.insert(tk.INSERT, f"[截图: {rel_path}]\n")
+                text_widget.insert(tk.INSERT, f"[截图: {filepath}]\n")
 
     def _bind_paste_handler(self, text_widget):
         def _on_ctrl_v(event):
@@ -1045,6 +1167,69 @@ class PentestReportApp:
             self._clear_editor()
             self.project_var.set("")
 
+    @staticmethod
+    def _replace_screenshot_paths(content, replace_path):
+        if not content:
+            return content
+
+        def _replace(match):
+            return f"[截图: {replace_path(match.group(1))}]"
+
+        return SCREENSHOT_PATTERN.sub(_replace, content)
+
+    def _load_project_findings(self, findings, config_path):
+        config_dir = os.path.dirname(os.path.abspath(config_path))
+        findings = copy.deepcopy(findings)
+        for finding in findings:
+            finding["verify_steps"] = self._replace_screenshot_paths(
+                finding.get("verify_steps", ""),
+                lambda image_path: self._resolve_screenshot_path(
+                    image_path, config_dir
+                ),
+            )
+        return findings
+
+    def _make_project_findings_portable(self, findings, config_path):
+        config_dir = os.path.dirname(os.path.abspath(config_path))
+        config_name = os.path.splitext(os.path.basename(config_path))[0]
+        assets_dir = os.path.join(config_dir, f"{config_name}_attachments")
+        copied_paths = {}
+        reserved_destinations = {}
+
+        def _copy_attachment(image_path):
+            source = self._resolve_screenshot_path(image_path)
+            if not os.path.exists(source):
+                return image_path
+            source = os.path.abspath(source)
+            if source not in copied_paths:
+                os.makedirs(assets_dir, exist_ok=True)
+                filename = os.path.basename(source)
+                destination = os.path.join(assets_dir, filename)
+                stem, extension = os.path.splitext(filename)
+                suffix = 2
+                while (
+                    destination in reserved_destinations
+                    and reserved_destinations[destination] != source
+                ):
+                    destination = os.path.join(
+                        assets_dir, f"{stem}_{suffix}{extension}"
+                    )
+                    suffix += 1
+                reserved_destinations[destination] = source
+                if os.path.abspath(destination) != source:
+                    shutil.copy2(source, destination)
+                copied_paths[source] = os.path.relpath(destination, config_dir).replace(
+                    "\\", "/"
+                )
+            return copied_paths[source]
+
+        portable_findings = copy.deepcopy(findings)
+        for finding in portable_findings:
+            finding["verify_steps"] = self._replace_screenshot_paths(
+                finding.get("verify_steps", ""), _copy_attachment
+            )
+        return portable_findings
+
     def _load_config(self):
         path = filedialog.askopenfilename(
             title="选择配置文件",
@@ -1056,7 +1241,9 @@ class PentestReportApp:
             with open(path, "r", encoding="utf-8") as f:
                 config = json.load(f)
             self.project_var.set(config.get("project_name", ""))
-            self.findings = config.get("findings", [])
+            self.findings = self._load_project_findings(
+                config.get("findings", []), path
+            )
             self._refresh_findings_list()
             messagebox.showinfo("提示", f"已加载 {len(self.findings)} 条漏洞记录")
         except Exception as e:
@@ -1075,7 +1262,7 @@ class PentestReportApp:
             return
         config = {
             "project_name": self.project_var.get().strip(),
-            "findings": self.findings,
+            "findings": self._make_project_findings_portable(self.findings, path),
         }
         try:
             with open(path, "w", encoding="utf-8") as f:

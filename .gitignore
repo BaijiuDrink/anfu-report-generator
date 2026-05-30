@@ -28,7 +28,6 @@ share/python-wheels/
 
 # PyInstaller
 *.manifest
-*.spec
 
 # Unit test / coverage reports
 htmlcov/

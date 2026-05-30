@@ -4,8 +4,8 @@ import datetime
 from docx import Document
 from docx.shared import Inches, Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml.ns import nsdecls
-from docx.oxml import parse_xml
+from docx.oxml.ns import nsdecls, qn
+from docx.oxml import OxmlElement, parse_xml
 from PIL import Image
 
 _XML_INVALID_CHARS = re.compile(
@@ -38,6 +38,13 @@ ZONE_COLORS = {
     "互联网": RGBColor(0x00, 0x70, 0xC0),
     "内网": RGBColor(0x00, 0x80, 0x40),
 }
+
+
+def _ordered_zones(grouped):
+    standard_zones = ["互联网", "内网"]
+    return standard_zones + sorted(
+        zone for zone in grouped if zone not in standard_zones
+    )
 
 
 def _add_run(paragraph, text, bold=False, size=None, color=None, font_name=FONT_NAME):
@@ -202,8 +209,14 @@ class ReportBuilder:
     def __init__(self, project_name="渗透测试报告"):
         self.document = Document()
         self.project_name = _sanitize(project_name)
+        self._disable_image_compression()
         self._setup_page()
         self._add_cover()
+
+    def _disable_image_compression(self):
+        settings = self.document.settings.element
+        if settings.find(qn("w:doNotCompressPictures")) is None:
+            settings.append(OxmlElement("w:doNotCompressPictures"))
 
     def _setup_page(self):
         section = self.document.sections[0]
@@ -288,7 +301,7 @@ class ReportBuilder:
         sum_p.paragraph_format.space_after = Pt(4)
         _add_run(sum_p, f"本次渗透测试共发现 {total} 个安全漏洞。", size=11)
 
-        for zone in ["互联网", "内网"]:
+        for zone in _ordered_zones(zone_counts):
             if zone not in zone_counts:
                 continue
             zc = zone_counts[zone]
@@ -469,7 +482,7 @@ class ReportBuilder:
 
         part_num = 1
         global_idx = 1
-        for zone in ["互联网", "内网"]:
+        for zone in _ordered_zones(grouped):
             zone_findings = grouped.get(zone, [])
             if not zone_findings:
                 continue
