@@ -593,7 +593,7 @@ class PentestReportApp:
 
     @staticmethod
     def _create_preview_photo(image, max_size=(1000, 700)):
-        preview = image.copy()
+        preview = PentestReportApp._flatten_transparency(image)
         preview.thumbnail(max_size, Image.Resampling.LANCZOS)
         return ImageTk.PhotoImage(preview)
 
@@ -838,18 +838,25 @@ class PentestReportApp:
                     return None
                 try:
                     old_bmp = gdi32.SelectObject(mdc, hbmp)
+                    # EMF rendering through GDI does not reliably populate the alpha
+                    # channel. Paint an opaque-looking background before playback and
+                    # decode the result as RGB so saved PNG files are not transparent.
+                    gdi32.PatBlt(mdc, 0, 0, w, h, 0x00FF0062)  # WHITENESS
                     hemf = gdi32.SetEnhMetaFileBits(len(emf_data), emf_data)
+                    rendered = False
                     if hemf:
                         from ctypes import wintypes
 
-                        gdi32.PlayEnhMetaFile(
+                        rendered = gdi32.PlayEnhMetaFile(
                             mdc, hemf, ctypes.byref(wintypes.RECT(0, 0, w, h))
                         )
                         gdi32.DeleteEnhMetaFile(hemf)
                     gdi32.SelectObject(mdc, old_bmp)
+                    if not rendered:
+                        return None
                     pixel_data = ctypes.string_at(pBits, w * h * 4)
                     img = Image.frombuffer(
-                        "RGBA", (w, h), pixel_data, "raw", "BGRA", 0, 1
+                        "RGB", (w, h), pixel_data, "raw", "BGRX", 0, 1
                     )
                     return img
                 finally:
@@ -863,6 +870,15 @@ class PentestReportApp:
     @staticmethod
     def _copy_image(image):
         image.load()
+        return image.copy()
+
+    @staticmethod
+    def _flatten_transparency(image):
+        if image.mode in ("RGBA", "LA") or "transparency" in image.info:
+            rgba = image.convert("RGBA")
+            background = Image.new("RGB", rgba.size, "white")
+            background.paste(rgba, mask=rgba.getchannel("A"))
+            return background
         return image.copy()
 
     def _decode_encoded_image(self, data):
@@ -905,8 +921,20 @@ class PentestReportApp:
         return image.width * image.height
 
     @staticmethod
+    def _image_has_visible_content(image):
+        preview = PentestReportApp._flatten_transparency(image).convert("RGB")
+        preview.thumbnail((64, 64), Image.Resampling.LANCZOS)
+        extrema = preview.getextrema()
+        if any(high - low > 2 for low, high in extrema):
+            return True
+        sample = preview.getpixel((0, 0))
+        return not all(channel >= 253 for channel in sample) and not all(
+            channel <= 2 for channel in sample
+        )
+
+    @staticmethod
     def _image_signature(image):
-        thumbnail = image.convert("RGB")
+        thumbnail = PentestReportApp._flatten_transparency(image).convert("RGB")
         thumbnail.thumbnail((32, 32), Image.Resampling.LANCZOS)
         return image.size, hash(thumbnail.tobytes())
 
@@ -918,6 +946,15 @@ class PentestReportApp:
         ]
         if not image_indexes or not candidates:
             return segments
+
+        visible_candidates = [
+            candidate
+            for candidate in candidates
+            if self._image_has_visible_content(candidate)
+        ]
+        if not visible_candidates:
+            return segments
+        candidates = visible_candidates
 
         unique_candidates = {}
         for candidate in candidates:
@@ -1122,7 +1159,13 @@ class PentestReportApp:
         if segments:
             return self._prefer_best_images(segments, image_candidates)
         if image_candidates:
-            segments.append(max(image_candidates, key=self._image_quality_score))
+            visible_candidates = [
+                image
+                for image in image_candidates
+                if self._image_has_visible_content(image)
+            ]
+            if visible_candidates:
+                segments.append(max(visible_candidates, key=self._image_quality_score))
 
         return segments
 
@@ -1137,9 +1180,10 @@ class PentestReportApp:
                 filename = f"paste_{timestamp}.png"
                 filepath = os.path.join(self.screenshots_dir, filename)
 
-                item.save(filepath, "PNG")
+                saved_image = self._flatten_transparency(item)
+                saved_image.save(filepath, "PNG")
 
-                photo = self._create_preview_photo(item)
+                photo = self._create_preview_photo(saved_image)
                 self._paste_images.append(photo)
 
                 text_widget.insert(tk.INSERT, "\n")
