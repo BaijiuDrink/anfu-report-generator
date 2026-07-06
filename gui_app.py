@@ -45,13 +45,47 @@ SCREENSHOT_PATTERN = re.compile(
 
 RISK_LEVELS_SHORT = ["严重", "高危", "中危", "低危", "信息"]
 
+COLORS = {
+    "bg": "#F4F7FB",
+    "surface": "#FFFFFF",
+    "surface_alt": "#F8FAFC",
+    "border": "#DCE4EE",
+    "text": "#172033",
+    "muted": "#6B778C",
+    "primary": "#2563EB",
+    "primary_hover": "#1D4ED8",
+    "primary_pressed": "#1E40AF",
+    "danger": "#DC2626",
+    "danger_hover": "#B91C1C",
+    "selection": "#E8F0FF",
+}
+
+
+def _style_text_widget(widget, muted=False):
+    widget.configure(
+        font=("微软雅黑", 9),
+        background=COLORS["surface_alt"] if muted else COLORS["surface"],
+        foreground=COLORS["text"],
+        insertbackground=COLORS["text"],
+        selectbackground=COLORS["selection"],
+        selectforeground=COLORS["text"],
+        relief=tk.FLAT,
+        borderwidth=0,
+        highlightthickness=1,
+        highlightbackground=COLORS["border"],
+        highlightcolor=COLORS["primary"],
+        padx=8,
+        pady=6,
+    )
+
 
 class PentestReportApp:
     def __init__(self, root):
         self.root = root
         self.root.title("渗透测试报告生成工具 v2.0")
-        self.root.geometry("1280x820")
-        self.root.minsize(1100, 700)
+        self.root.geometry("1360x860")
+        self.root.minsize(1180, 740)
+        self.root.configure(background=COLORS["bg"])
 
         self._prepare_data_dirs()
         self.vuln_manager = VulnManager(DEFAULT_LIBRARY)
@@ -80,14 +114,178 @@ class PentestReportApp:
     def _setup_styles(self):
         style = ttk.Style()
         style.theme_use("clam")
+        style.configure(".", font=("微软雅黑", 9), background=COLORS["bg"])
+        style.configure("TFrame", background=COLORS["surface"])
+        style.configure("App.TFrame", background=COLORS["bg"])
+        style.configure("Header.TFrame", background=COLORS["surface"])
+        style.configure("Card.TFrame", background=COLORS["surface"])
         style.configure(
-            "Title.TLabel", font=("微软雅黑", 16, "bold"), foreground="#2F5496"
+            "Panel.TFrame",
+            background=COLORS["surface"],
+            bordercolor=COLORS["border"],
+            lightcolor=COLORS["border"],
+            darkcolor=COLORS["border"],
+            borderwidth=1,
+            relief="solid",
+        )
+        style.configure("Toolbar.TFrame", background=COLORS["surface"])
+        style.configure(
+            "TLabel", background=COLORS["surface"], foreground=COLORS["text"]
         )
         style.configure(
-            "Section.TLabel", font=("微软雅黑", 11, "bold"), foreground="#333333"
+            "Card.TLabel", background=COLORS["surface"], foreground=COLORS["text"]
         )
-        style.configure("Library.Treeview", rowheight=24, font=("微软雅黑", 9))
-        style.configure("Finding.Treeview", rowheight=22, font=("微软雅黑", 9))
+        style.configure(
+            "Title.TLabel",
+            background=COLORS["surface"],
+            foreground=COLORS["text"],
+            font=("微软雅黑", 18, "bold"),
+        )
+        style.configure(
+            "Subtitle.TLabel",
+            background=COLORS["surface"],
+            foreground=COLORS["muted"],
+            font=("微软雅黑", 9),
+        )
+        style.configure(
+            "Section.TLabel",
+            background=COLORS["surface"],
+            foreground=COLORS["text"],
+            font=("微软雅黑", 11, "bold"),
+        )
+        style.configure(
+            "Muted.TLabel",
+            background=COLORS["surface"],
+            foreground=COLORS["muted"],
+            font=("微软雅黑", 9),
+        )
+        style.configure(
+            "Field.TLabel",
+            background=COLORS["surface"],
+            foreground=COLORS["muted"],
+            font=("微软雅黑", 9, "bold"),
+        )
+        style.configure(
+            "TEntry",
+            fieldbackground=COLORS["surface"],
+            foreground=COLORS["text"],
+            bordercolor=COLORS["border"],
+            lightcolor=COLORS["border"],
+            darkcolor=COLORS["border"],
+            padding=(8, 6),
+        )
+        style.map(
+            "TEntry",
+            bordercolor=[("focus", COLORS["primary"])],
+            lightcolor=[("focus", COLORS["primary"])],
+            darkcolor=[("focus", COLORS["primary"])],
+        )
+        style.configure(
+            "TButton",
+            background=COLORS["surface_alt"],
+            foreground=COLORS["text"],
+            bordercolor=COLORS["border"],
+            lightcolor=COLORS["border"],
+            darkcolor=COLORS["border"],
+            padding=(10, 6),
+            relief="flat",
+        )
+        style.map(
+            "TButton",
+            background=[("active", "#EEF2F7"), ("pressed", "#E2E8F0")],
+            bordercolor=[("active", "#CBD5E1")],
+        )
+        style.configure(
+            "Primary.TButton",
+            background=COLORS["primary"],
+            foreground="#FFFFFF",
+            bordercolor=COLORS["primary"],
+            lightcolor=COLORS["primary"],
+            darkcolor=COLORS["primary"],
+            padding=(14, 7),
+            font=("微软雅黑", 9, "bold"),
+        )
+        style.map(
+            "Primary.TButton",
+            background=[
+                ("active", COLORS["primary_hover"]),
+                ("pressed", COLORS["primary_pressed"]),
+            ],
+            foreground=[("disabled", "#CBD5E1")],
+        )
+        style.configure(
+            "Danger.TButton",
+            background=COLORS["surface"],
+            foreground=COLORS["danger"],
+            bordercolor=COLORS["border"],
+            lightcolor=COLORS["border"],
+            darkcolor=COLORS["border"],
+        )
+        style.map(
+            "Danger.TButton",
+            background=[("active", "#FEF2F2")],
+            foreground=[("active", COLORS["danger_hover"])],
+        )
+        style.configure(
+            "TRadiobutton",
+            background=COLORS["surface"],
+            foreground=COLORS["text"],
+            padding=(2, 2),
+        )
+        style.map(
+            "TRadiobutton",
+            background=[("active", COLORS["surface"])],
+            foreground=[("active", COLORS["primary"])],
+        )
+        style.configure(
+            "Modern.Treeview",
+            background=COLORS["surface"],
+            fieldbackground=COLORS["surface"],
+            foreground=COLORS["text"],
+            bordercolor=COLORS["border"],
+            lightcolor=COLORS["border"],
+            darkcolor=COLORS["border"],
+            rowheight=30,
+            font=("微软雅黑", 9),
+        )
+        style.configure(
+            "Modern.Treeview.Heading",
+            background=COLORS["surface_alt"],
+            foreground=COLORS["muted"],
+            bordercolor=COLORS["border"],
+            lightcolor=COLORS["border"],
+            darkcolor=COLORS["border"],
+            relief="flat",
+            padding=(6, 7),
+            font=("微软雅黑", 9, "bold"),
+        )
+        style.map(
+            "Modern.Treeview",
+            background=[("selected", COLORS["selection"])],
+            foreground=[("selected", COLORS["text"])],
+        )
+        style.map(
+            "Modern.Treeview.Heading",
+            background=[("active", "#EEF2F7")],
+        )
+        style.configure("Library.Treeview", rowheight=30)
+        style.configure("Finding.Treeview", rowheight=30)
+        style.layout("Library.Treeview", style.layout("Modern.Treeview"))
+        style.layout("Finding.Treeview", style.layout("Modern.Treeview"))
+        style.configure(
+            "Card.TLabelframe",
+            background=COLORS["surface"],
+            bordercolor=COLORS["border"],
+            lightcolor=COLORS["border"],
+            darkcolor=COLORS["border"],
+            relief="solid",
+        )
+        style.configure(
+            "Card.TLabelframe.Label",
+            background=COLORS["surface"],
+            foreground=COLORS["text"],
+            font=("微软雅黑", 11, "bold"),
+        )
 
     def _build_ui(self):
         self.root.grid_rowconfigure(0, weight=0)
@@ -98,63 +296,93 @@ class PentestReportApp:
         self._build_main_area()
 
     def _build_top_bar(self):
-        top = ttk.Frame(self.root, padding=(10, 8, 10, 4))
+        top = ttk.Frame(self.root, padding=(22, 14, 22, 14), style="Header.TFrame")
         top.grid(row=0, column=0, sticky="ew")
+        top.grid_columnconfigure(1, weight=1)
 
-        ttk.Label(top, text="渗透测试报告生成工具", style="Title.TLabel").pack(
-            side=tk.LEFT, padx=(0, 20)
+        title_box = ttk.Frame(top, style="Header.TFrame")
+        title_box.grid(row=0, column=0, rowspan=2, sticky="w", padx=(0, 32))
+        ttk.Label(title_box, text="渗透测试报告生成工具", style="Title.TLabel").pack(
+            anchor="w"
         )
+        ttk.Label(
+            title_box,
+            text="整理漏洞、粘贴证据并生成规范报告",
+            style="Subtitle.TLabel",
+        ).pack(anchor="w", pady=(2, 0))
 
-        ttk.Label(top, text="项目名称:").pack(side=tk.LEFT, padx=(10, 4))
+        project_box = ttk.Frame(top, style="Header.TFrame")
+        project_box.grid(row=0, column=1, rowspan=2, sticky="ew", padx=(0, 20))
+        project_box.grid_columnconfigure(0, weight=1)
+        ttk.Label(project_box, text="当前项目", style="Subtitle.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 4)
+        )
         self.project_var = tk.StringVar(value="XXX公司渗透测试")
         ttk.Entry(
-            top, textvariable=self.project_var, width=30, font=("微软雅黑", 10)
-        ).pack(side=tk.LEFT, padx=(0, 10))
+            project_box, textvariable=self.project_var, font=("微软雅黑", 10)
+        ).grid(row=1, column=0, sticky="ew")
 
-        ttk.Button(top, text="新建项目", command=self._clear_findings).pack(
-            side=tk.LEFT, padx=4
+        actions = ttk.Frame(top, style="Header.TFrame")
+        actions.grid(row=0, column=2, rowspan=2, sticky="e")
+        ttk.Button(actions, text="新建", command=self._clear_findings).pack(
+            side=tk.LEFT, padx=(0, 6)
         )
-        ttk.Button(top, text="加载配置", command=self._load_config).pack(
-            side=tk.LEFT, padx=4
+        ttk.Button(actions, text="加载", command=self._load_config).pack(
+            side=tk.LEFT, padx=6
         )
-        ttk.Button(top, text="保存配置", command=self._save_config).pack(
-            side=tk.LEFT, padx=4
+        ttk.Button(actions, text="保存", command=self._save_config).pack(
+            side=tk.LEFT, padx=6
         )
-        ttk.Button(top, text="批量录入", command=self._batch_add_dialog).pack(
-            side=tk.LEFT, padx=4
+        ttk.Button(actions, text="批量录入", command=self._batch_add_dialog).pack(
+            side=tk.LEFT, padx=6
         )
-        ttk.Button(top, text="生成报告", command=self._generate_report).pack(
-            side=tk.LEFT, padx=4
-        )
+        ttk.Button(
+            actions,
+            text="生成报告",
+            command=self._generate_report,
+            style="Primary.TButton",
+        ).pack(side=tk.LEFT, padx=(12, 0))
+
+        separator = tk.Frame(self.root, height=1, background=COLORS["border"])
+        separator.grid(row=0, column=0, sticky="sew")
 
     def _build_main_area(self):
         self.main_pane = tk.PanedWindow(
-            self.root, orient=tk.HORIZONTAL, sashwidth=5, sashrelief=tk.RAISED
+            self.root,
+            orient=tk.HORIZONTAL,
+            sashwidth=8,
+            sashrelief=tk.FLAT,
+            background=COLORS["bg"],
+            borderwidth=0,
+            showhandle=False,
         )
-        self.main_pane.grid(row=1, column=0, sticky="nsew")
+        self.main_pane.grid(row=1, column=0, sticky="nsew", padx=16, pady=16)
 
         left = self._build_left_panel_in(self.main_pane)
         right = self._build_right_panel_in()
 
-        self.main_pane.add(left, minsize=220, width=280)
+        self.main_pane.add(left, minsize=250, width=310)
         self.main_pane.add(right, minsize=550, stretch="always")
 
     # ── Left Panel: Vuln Library ──
     def _build_left_panel_in(self, parent):
-        left = ttk.Frame(parent, padding=(8, 4, 4, 8))
-        left.grid_rowconfigure(2, weight=1)
+        left = ttk.Frame(parent, padding=(14, 14, 14, 14), style="Panel.TFrame")
+        left.grid_rowconfigure(3, weight=2)
         left.grid_columnconfigure(0, weight=1)
 
         ttk.Label(left, text="漏洞库", style="Section.TLabel").grid(
-            row=0, column=0, sticky="w", pady=(0, 2)
+            row=0, column=0, sticky="w"
+        )
+        ttk.Label(left, text="双击条目可快速添加到项目", style="Muted.TLabel").grid(
+            row=1, column=0, sticky="w", pady=(3, 12)
         )
 
-        search_frame = ttk.Frame(left)
-        search_frame.grid(row=1, column=0, sticky="ew", pady=(0, 4))
+        search_frame = ttk.Frame(left, style="Card.TFrame")
+        search_frame.grid(row=2, column=0, sticky="ew", pady=(0, 10))
         self.search_var = tk.StringVar()
-        ttk.Entry(
-            search_frame, textvariable=self.search_var, width=22, font=("微软雅黑", 9)
-        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        ttk.Entry(search_frame, textvariable=self.search_var, width=22).pack(
+            side=tk.LEFT, fill=tk.X, expand=True
+        )
         ttk.Button(
             search_frame, text="搜索", command=self._search_library, width=5
         ).pack(side=tk.LEFT, padx=(2, 0))
@@ -162,7 +390,7 @@ class PentestReportApp:
 
         columns = ("name", "risk", "category")
         self.lib_tree = ttk.Treeview(
-            left, columns=columns, show="headings", height=20, style="Library.Treeview"
+            left, columns=columns, show="headings", height=20, style="Modern.Treeview"
         )
         self.lib_tree.heading("name", text="漏洞名称")
         self.lib_tree.heading("risk", text="等级")
@@ -170,32 +398,34 @@ class PentestReportApp:
         self.lib_tree.column("name", width=180, minwidth=120)
         self.lib_tree.column("risk", width=50, anchor="center")
         self.lib_tree.column("category", width=70, anchor="center")
-        self.lib_tree.grid(row=2, column=0, sticky="nsew")
+        self.lib_tree.grid(row=3, column=0, sticky="nsew")
 
         lib_scroll = ttk.Scrollbar(
             left, orient=tk.VERTICAL, command=self.lib_tree.yview
         )
-        lib_scroll.grid(row=2, column=1, sticky="ns")
+        lib_scroll.grid(row=3, column=1, sticky="ns")
         self.lib_tree.configure(yscrollcommand=lib_scroll.set)
 
         self.lib_tree.bind("<Double-1>", self._on_library_double_click)
         self.lib_tree.bind("<ButtonRelease-1>", self._on_library_select)
 
-        btn_frame = ttk.Frame(left)
-        btn_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(4, 0))
-        ttk.Button(btn_frame, text="添加到项目", command=self._add_from_library).pack(
-            side=tk.LEFT, padx=2
-        )
+        btn_frame = ttk.Frame(left, style="Card.TFrame")
+        btn_frame.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        ttk.Button(
+            btn_frame,
+            text="添加到项目",
+            command=self._add_from_library,
+            style="Primary.TButton",
+        ).pack(side=tk.LEFT)
         ttk.Button(
             btn_frame, text="管理漏洞库", command=self._open_library_manager
-        ).pack(side=tk.LEFT, padx=2)
+        ).pack(side=tk.LEFT, padx=(8, 0))
 
-        left.grid_rowconfigure(4, weight=1)
-        self.lib_preview_text = tk.Text(
-            left, height=8, font=("微软雅黑", 9), wrap=tk.WORD, state="disabled"
-        )
+        left.grid_rowconfigure(5, weight=1)
+        self.lib_preview_text = tk.Text(left, height=8, wrap=tk.WORD, state="disabled")
+        _style_text_widget(self.lib_preview_text, muted=True)
         self.lib_preview_text.grid(
-            row=4, column=0, columnspan=2, sticky="nsew", pady=(4, 0)
+            row=5, column=0, columnspan=2, sticky="nsew", pady=(12, 0)
         )
 
         return left
@@ -266,48 +496,63 @@ class PentestReportApp:
 
     # ── Right Panel: Findings + Editor ──
     def _build_right_panel_in(self):
-        right = ttk.Frame(self.main_pane, padding=(4, 4, 8, 4))
+        right = ttk.Frame(
+            self.main_pane, padding=(14, 14, 14, 14), style="Panel.TFrame"
+        )
         right.grid_rowconfigure(0, weight=0)
-        right.grid_rowconfigure(1, weight=1)
+        right.grid_rowconfigure(2, weight=1)
         right.grid_columnconfigure(0, weight=1)
 
         ttk.Label(right, text="已录入漏洞列表", style="Section.TLabel").grid(
             row=0, column=0, sticky="w"
         )
+        ttk.Label(
+            right, text="调整顺序后将按当前列表生成报告", style="Muted.TLabel"
+        ).grid(row=1, column=0, sticky="w", pady=(3, 12))
 
-        f_btn_frame = ttk.Frame(right)
-        f_btn_frame.grid(row=0, column=0, sticky="e")
+        f_btn_frame = ttk.Frame(right, style="Card.TFrame")
+        f_btn_frame.grid(row=0, column=0, rowspan=2, sticky="e")
         ttk.Button(
-            f_btn_frame, text="↑上移", command=lambda: self._move_finding(-1), width=5
-        ).pack(side=tk.LEFT, padx=1)
+            f_btn_frame, text="上移", command=lambda: self._move_finding(-1), width=5
+        ).pack(side=tk.LEFT, padx=(0, 4))
         ttk.Button(
-            f_btn_frame, text="↓下移", command=lambda: self._move_finding(1), width=5
-        ).pack(side=tk.LEFT, padx=1)
+            f_btn_frame, text="下移", command=lambda: self._move_finding(1), width=5
+        ).pack(side=tk.LEFT, padx=4)
         ttk.Button(f_btn_frame, text="编辑", command=self._edit_finding, width=5).pack(
-            side=tk.LEFT, padx=1
+            side=tk.LEFT, padx=4
         )
         ttk.Button(f_btn_frame, text="复制", command=self._copy_finding, width=5).pack(
-            side=tk.LEFT, padx=1
+            side=tk.LEFT, padx=4
         )
         ttk.Button(
-            f_btn_frame, text="×删除", command=self._delete_finding, width=5
-        ).pack(side=tk.LEFT, padx=1)
+            f_btn_frame,
+            text="删除",
+            command=self._delete_finding,
+            width=5,
+            style="Danger.TButton",
+        ).pack(side=tk.LEFT, padx=(4, 0))
 
         self.right_pane = tk.PanedWindow(
-            right, orient=tk.VERTICAL, sashwidth=5, sashrelief=tk.RAISED
+            right,
+            orient=tk.VERTICAL,
+            sashwidth=8,
+            sashrelief=tk.FLAT,
+            background=COLORS["surface"],
+            borderwidth=0,
+            showhandle=False,
         )
-        self.right_pane.grid(row=1, column=0, sticky="nsew", pady=(2, 0))
+        self.right_pane.grid(row=2, column=0, sticky="nsew")
 
         findings_frame = self._build_findings_list()
         editor_frame = self._build_editor_panel_in()
 
-        self.right_pane.add(findings_frame, minsize=100, height=140, stretch="always")
-        self.right_pane.add(editor_frame, minsize=250, stretch="always")
+        self.right_pane.add(findings_frame, minsize=90, height=130, stretch="always")
+        self.right_pane.add(editor_frame, minsize=220, height=520, stretch="always")
 
         return right
 
     def _build_findings_list(self):
-        list_frame = ttk.Frame(self.right_pane)
+        list_frame = ttk.Frame(self.right_pane, style="Card.TFrame")
         list_frame.grid_rowconfigure(0, weight=1)
         list_frame.grid_columnconfigure(0, weight=1)
 
@@ -317,7 +562,7 @@ class PentestReportApp:
             columns=f_columns,
             show="headings",
             height=5,
-            style="Finding.Treeview",
+            style="Modern.Treeview",
         )
         self.findings_tree.heading("idx", text="#")
         self.findings_tree.heading("zone", text="区域")
@@ -344,39 +589,94 @@ class PentestReportApp:
 
     def _build_editor_panel_in(self):
         editor_frame = ttk.LabelFrame(
-            self.right_pane, text="漏洞编辑区", padding=(8, 4, 8, 8)
+            self.right_pane,
+            text="漏洞编辑",
+            padding=(14, 10, 14, 14),
+            style="Card.TLabelframe",
         )
-        editor_frame.grid_columnconfigure(0, weight=0)
-        editor_frame.grid_columnconfigure(1, weight=1)
+        editor_frame.grid_rowconfigure(0, weight=1)
+        editor_frame.grid_columnconfigure(0, weight=1)
+
+        canvas = tk.Canvas(
+            editor_frame,
+            background=COLORS["surface"],
+            borderwidth=0,
+            highlightthickness=0,
+            yscrollincrement=20,
+        )
+        editor_scroll = ttk.Scrollbar(
+            editor_frame, orient=tk.VERTICAL, command=canvas.yview
+        )
+        canvas.configure(yscrollcommand=editor_scroll.set)
+        canvas.grid(row=0, column=0, sticky="nsew")
+        editor_scroll.grid(row=0, column=1, sticky="ns", padx=(8, 0))
+
+        form_frame = ttk.Frame(canvas, style="Card.TFrame")
+        form_window = canvas.create_window((0, 0), window=form_frame, anchor="nw")
+        form_frame.grid_columnconfigure(0, weight=0)
+        form_frame.grid_columnconfigure(1, weight=1)
+
+        def _sync_scroll_region(event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def _sync_form_width(event):
+            canvas.itemconfigure(form_window, width=event.width)
+
+        def _on_mousewheel(event):
+            if event.delta:
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            return "break"
+
+        def _bind_wheel_to_children(widget):
+            if not isinstance(widget, tk.Text):
+                widget.bind("<MouseWheel>", _on_mousewheel)
+            for child in widget.winfo_children():
+                _bind_wheel_to_children(child)
+
+        def _create_scrolled_text(parent, height):
+            text_frame = ttk.Frame(parent, style="Card.TFrame")
+            text_frame.grid_columnconfigure(0, weight=1)
+            text_frame.grid_rowconfigure(0, weight=1)
+            text_widget = tk.Text(text_frame, height=height, wrap=tk.WORD)
+            _style_text_widget(text_widget)
+            text_scroll = ttk.Scrollbar(
+                text_frame, orient=tk.VERTICAL, command=text_widget.yview
+            )
+            text_widget.configure(yscrollcommand=text_scroll.set)
+            text_widget.grid(row=0, column=0, sticky="nsew")
+            text_scroll.grid(row=0, column=1, sticky="ns")
+            return text_frame, text_widget
+
+        form_frame.bind("<Configure>", _sync_scroll_region)
+        canvas.bind("<Configure>", _sync_form_width)
+        canvas.bind("<MouseWheel>", _on_mousewheel)
 
         text_rows = [1, 5, 6, 7, 8, 9]
         for r in text_rows:
-            editor_frame.grid_rowconfigure(r, weight=1)
+            form_frame.grid_rowconfigure(r, weight=1)
 
         row = 0
-        ttk.Label(editor_frame, text="漏洞名称:", font=("微软雅黑", 9, "bold")).grid(
+        ttk.Label(form_frame, text="漏洞名称", style="Field.TLabel").grid(
             row=row, column=0, sticky="w", pady=1
         )
         self.editor_name = tk.StringVar()
-        ttk.Entry(
-            editor_frame, textvariable=self.editor_name, font=("微软雅黑", 9)
-        ).grid(row=row, column=1, sticky="ew", pady=1, padx=(4, 0))
+        ttk.Entry(form_frame, textvariable=self.editor_name).grid(
+            row=row, column=1, sticky="ew", pady=4, padx=(12, 0)
+        )
 
         row = 1
-        ttk.Label(editor_frame, text="漏洞地址:", font=("微软雅黑", 9, "bold")).grid(
+        ttk.Label(form_frame, text="漏洞地址", style="Field.TLabel").grid(
             row=row, column=0, sticky="nw", pady=1
         )
-        self.editor_url = tk.Text(
-            editor_frame, height=3, font=("微软雅黑", 9), wrap=tk.WORD
-        )
-        self.editor_url.grid(row=row, column=1, sticky="nsew", pady=1, padx=(4, 0))
+        url_frame, self.editor_url = _create_scrolled_text(form_frame, height=3)
+        url_frame.grid(row=row, column=1, sticky="nsew", pady=4, padx=(12, 0))
 
         row = 2
-        ttk.Label(editor_frame, text="网络区域:", font=("微软雅黑", 9, "bold")).grid(
+        ttk.Label(form_frame, text="网络区域", style="Field.TLabel").grid(
             row=row, column=0, sticky="w", pady=1
         )
-        zone_frame = ttk.Frame(editor_frame)
-        zone_frame.grid(row=row, column=1, sticky="w", pady=1, padx=(4, 0))
+        zone_frame = ttk.Frame(form_frame, style="Card.TFrame")
+        zone_frame.grid(row=row, column=1, sticky="w", pady=4, padx=(12, 0))
         self.editor_zone = tk.StringVar(value="互联网")
         for z in NETWORK_ZONES:
             ttk.Radiobutton(
@@ -384,11 +684,11 @@ class PentestReportApp:
             ).pack(side=tk.LEFT, padx=2)
 
         row = 3
-        ttk.Label(editor_frame, text="风险等级:", font=("微软雅黑", 9, "bold")).grid(
+        ttk.Label(form_frame, text="风险等级", style="Field.TLabel").grid(
             row=row, column=0, sticky="w", pady=1
         )
-        risk_frame = ttk.Frame(editor_frame)
-        risk_frame.grid(row=row, column=1, sticky="w", pady=1, padx=(4, 0))
+        risk_frame = ttk.Frame(form_frame, style="Card.TFrame")
+        risk_frame.grid(row=row, column=1, sticky="w", pady=4, padx=(12, 0))
         self.editor_risk = tk.StringVar(value="中危")
         for r in RISK_LEVELS_SHORT:
             ttk.Radiobutton(
@@ -396,11 +696,11 @@ class PentestReportApp:
             ).pack(side=tk.LEFT, padx=2)
 
         row = 4
-        ttk.Label(editor_frame, text="修复优先级:", font=("微软雅黑", 9, "bold")).grid(
+        ttk.Label(form_frame, text="修复优先级", style="Field.TLabel").grid(
             row=row, column=0, sticky="w", pady=1
         )
-        pri_frame = ttk.Frame(editor_frame)
-        pri_frame.grid(row=row, column=1, sticky="w", pady=1, padx=(4, 0))
+        pri_frame = ttk.Frame(form_frame, style="Card.TFrame")
+        pri_frame.grid(row=row, column=1, sticky="w", pady=4, padx=(12, 0))
         self.editor_priority = tk.StringVar(value="高")
         for p in FIX_PRIORITIES:
             ttk.Radiobutton(
@@ -408,70 +708,66 @@ class PentestReportApp:
             ).pack(side=tk.LEFT, padx=2)
 
         row = 5
-        ttk.Label(editor_frame, text="漏洞描述:", font=("微软雅黑", 9, "bold")).grid(
+        ttk.Label(form_frame, text="漏洞描述", style="Field.TLabel").grid(
             row=row, column=0, sticky="nw", pady=1
         )
-        self.editor_description = tk.Text(
-            editor_frame, height=3, font=("微软雅黑", 9), wrap=tk.WORD
+        description_frame, self.editor_description = _create_scrolled_text(
+            form_frame, height=3
         )
-        self.editor_description.grid(
-            row=row, column=1, sticky="nsew", pady=1, padx=(4, 0)
-        )
+        description_frame.grid(row=row, column=1, sticky="nsew", pady=4, padx=(12, 0))
 
         row = 6
-        ttk.Label(editor_frame, text="漏洞验证:", font=("微软雅黑", 9, "bold")).grid(
+        ttk.Label(form_frame, text="漏洞验证", style="Field.TLabel").grid(
             row=row, column=0, sticky="nw", pady=1
         )
-        self.editor_verify_steps = tk.Text(
-            editor_frame, height=8, font=("微软雅黑", 9), wrap=tk.WORD
+        verify_steps_frame, self.editor_verify_steps = _create_scrolled_text(
+            form_frame, height=8
         )
-        self.editor_verify_steps.grid(
-            row=row, column=1, sticky="nsew", pady=1, padx=(4, 0)
-        )
+        verify_steps_frame.grid(row=row, column=1, sticky="nsew", pady=4, padx=(12, 0))
         self._bind_paste_handler(self.editor_verify_steps)
 
         row = 7
-        ttk.Label(editor_frame, text="验证结果:", font=("微软雅黑", 9, "bold")).grid(
+        ttk.Label(form_frame, text="验证结果", style="Field.TLabel").grid(
             row=row, column=0, sticky="nw", pady=1
         )
-        self.editor_verify_result = tk.Text(
-            editor_frame, height=2, font=("微软雅黑", 9), wrap=tk.WORD
+        verify_result_frame, self.editor_verify_result = _create_scrolled_text(
+            form_frame, height=2
         )
-        self.editor_verify_result.grid(
-            row=row, column=1, sticky="nsew", pady=1, padx=(4, 0)
-        )
+        verify_result_frame.grid(row=row, column=1, sticky="nsew", pady=4, padx=(12, 0))
 
         row = 8
-        ttk.Label(editor_frame, text="修复建议:", font=("微软雅黑", 9, "bold")).grid(
+        ttk.Label(form_frame, text="修复建议", style="Field.TLabel").grid(
             row=row, column=0, sticky="nw", pady=1
         )
-        self.editor_fix_suggestion = tk.Text(
-            editor_frame, height=3, font=("微软雅黑", 9), wrap=tk.WORD
+        fix_suggestion_frame, self.editor_fix_suggestion = _create_scrolled_text(
+            form_frame, height=3
         )
-        self.editor_fix_suggestion.grid(
-            row=row, column=1, sticky="nsew", pady=1, padx=(4, 0)
+        fix_suggestion_frame.grid(
+            row=row, column=1, sticky="nsew", pady=4, padx=(12, 0)
         )
 
         row = 9
-        ttk.Label(
-            editor_frame, text="整改验证方法:", font=("微软雅黑", 9, "bold")
-        ).grid(row=row, column=0, sticky="nw", pady=1)
-        self.editor_fix_verify = tk.Text(
-            editor_frame, height=2, font=("微软雅黑", 9), wrap=tk.WORD
+        ttk.Label(form_frame, text="整改验证方法", style="Field.TLabel").grid(
+            row=row, column=0, sticky="nw", pady=1
         )
-        self.editor_fix_verify.grid(
-            row=row, column=1, sticky="nsew", pady=1, padx=(4, 0)
+        fix_verify_frame, self.editor_fix_verify = _create_scrolled_text(
+            form_frame, height=2
         )
+        fix_verify_frame.grid(row=row, column=1, sticky="nsew", pady=4, padx=(12, 0))
 
         row = 10
-        btn_row = ttk.Frame(editor_frame)
-        btn_row.grid(row=row, column=0, columnspan=2, sticky="e", pady=(4, 0))
-        ttk.Button(btn_row, text="✓ 保存漏洞", command=self._save_current_finding).pack(
-            side=tk.RIGHT, padx=2
-        )
+        btn_row = ttk.Frame(form_frame, style="Card.TFrame")
+        btn_row.grid(row=row, column=0, columnspan=2, sticky="e", pady=(10, 0))
+        ttk.Button(
+            btn_row,
+            text="保存漏洞",
+            command=self._save_current_finding,
+            style="Primary.TButton",
+        ).pack(side=tk.RIGHT)
         ttk.Button(btn_row, text="清空表单", command=self._clear_editor).pack(
-            side=tk.RIGHT, padx=2
+            side=tk.RIGHT, padx=(0, 8)
         )
+        _bind_wheel_to_children(form_frame)
 
         self.editor_template_id = None
         return editor_frame
@@ -703,11 +999,12 @@ class PentestReportApp:
         dialog = tk.Toplevel(self.root)
         dialog.title("批量录入漏洞")
         dialog.geometry("520x420")
+        dialog.configure(background=COLORS["bg"])
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
 
-        frm = ttk.Frame(dialog, padding=(12, 10, 12, 10))
+        frm = ttk.Frame(dialog, padding=(18, 16, 18, 16), style="Card.TFrame")
         frm.pack(fill=tk.BOTH, expand=True)
 
         ttk.Label(frm, text="漏洞库ID:", font=("微软雅黑", 9, "bold")).grid(
@@ -732,7 +1029,8 @@ class PentestReportApp:
         ttk.Label(
             frm, text="主机列表\n(一行一个IP/URL):", font=("微软雅黑", 9, "bold")
         ).grid(row=2, column=0, sticky="nw", pady=2)
-        hosts_text = tk.Text(frm, height=8, font=("微软雅黑", 9), wrap=tk.WORD)
+        hosts_text = tk.Text(frm, height=8, wrap=tk.WORD)
+        _style_text_widget(hosts_text)
         hosts_text.grid(row=2, column=1, sticky="ew", padx=(8, 0), pady=2)
 
         ttk.Label(
@@ -1352,6 +1650,7 @@ class LibraryManagerDialog(tk.Toplevel):
         self.refresh_callback = refresh_callback
         self.title("漏洞库管理")
         self.geometry("700x500")
+        self.configure(background=COLORS["bg"])
         self.resizable(True, True)
         self.transient(parent)
         self.grab_set()
@@ -1363,7 +1662,7 @@ class LibraryManagerDialog(tk.Toplevel):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        tree_frame = ttk.Frame(self, padding=(8, 8, 4, 8))
+        tree_frame = ttk.Frame(self, padding=(14, 14, 8, 14), style="Card.TFrame")
         tree_frame.grid(row=0, column=0, sticky="nsew")
         tree_frame.grid_rowconfigure(0, weight=1)
         tree_frame.grid_columnconfigure(0, weight=1)
@@ -1374,7 +1673,7 @@ class LibraryManagerDialog(tk.Toplevel):
             columns=columns,
             show="headings",
             height=15,
-            style="Library.Treeview",
+            style="Modern.Treeview",
         )
         self.tree.heading("id", text="ID")
         self.tree.heading("name", text="名称")
@@ -1392,21 +1691,26 @@ class LibraryManagerDialog(tk.Toplevel):
 
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
 
-        btn_frame = ttk.Frame(tree_frame)
-        btn_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(4, 0))
-        ttk.Button(btn_frame, text="新增", command=self._add).pack(side=tk.LEFT, padx=2)
+        btn_frame = ttk.Frame(tree_frame, style="Card.TFrame")
+        btn_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        ttk.Button(
+            btn_frame, text="新增", command=self._add, style="Primary.TButton"
+        ).pack(side=tk.LEFT)
         ttk.Button(btn_frame, text="编辑", command=self._edit).pack(
-            side=tk.LEFT, padx=2
+            side=tk.LEFT, padx=(8, 0)
         )
-        ttk.Button(btn_frame, text="删除", command=self._delete).pack(
-            side=tk.LEFT, padx=2
-        )
+        ttk.Button(
+            btn_frame, text="删除", command=self._delete, style="Danger.TButton"
+        ).pack(side=tk.LEFT, padx=(8, 0))
 
-        detail_frame = ttk.LabelFrame(self, text="漏洞详情", padding=(8, 4, 8, 8))
-        detail_frame.grid(row=0, column=1, sticky="nsew", padx=(4, 8), pady=8)
-        self.detail_text = tk.Text(
-            detail_frame, width=35, font=("微软雅黑", 9), wrap=tk.WORD, state="disabled"
+        detail_frame = ttk.LabelFrame(
+            self, text="漏洞详情", padding=(12, 8, 12, 12), style="Card.TLabelframe"
         )
+        detail_frame.grid(row=0, column=1, sticky="nsew", padx=(8, 14), pady=14)
+        self.detail_text = tk.Text(
+            detail_frame, width=35, wrap=tk.WORD, state="disabled"
+        )
+        _style_text_widget(self.detail_text, muted=True)
         self.detail_text.pack(fill=tk.BOTH, expand=True)
 
     def _refresh_list(self):
@@ -1492,6 +1796,7 @@ class VulnEditDialog(tk.Toplevel):
         self.result = None
         self.title("编辑漏洞" if existing else "新增漏洞")
         self.geometry("550x650")
+        self.configure(background=COLORS["bg"])
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
@@ -1502,7 +1807,7 @@ class VulnEditDialog(tk.Toplevel):
         self.wait_window()
 
     def _build_ui(self):
-        frame = ttk.Frame(self, padding=(12, 10, 12, 10))
+        frame = ttk.Frame(self, padding=(18, 16, 18, 16), style="Card.TFrame")
         frame.pack(fill=tk.BOTH, expand=True)
 
         labels = [
@@ -1559,9 +1864,8 @@ class VulnEditDialog(tk.Toplevel):
             ttk.Label(frame, text=label_text, font=("微软雅黑", 9, "bold")).grid(
                 row=row, column=0, sticky="nw", pady=3
             )
-            txt = tk.Text(
-                frame, height=height, font=("微软雅黑", 9), wrap=tk.WORD, width=40
-            )
+            txt = tk.Text(frame, height=height, wrap=tk.WORD, width=40)
+            _style_text_widget(txt)
             txt.grid(row=row, column=1, sticky="ew", pady=3, padx=(8, 0))
             self.widgets[attr] = txt
             row += 1

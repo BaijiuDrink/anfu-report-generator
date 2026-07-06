@@ -29,6 +29,8 @@ RISK_COLORS = {
     "信息": RGBColor(0, 0, 200),
 }
 
+PLACEHOLDER_TEXT = "（待补充）"
+
 FONT_NAME = "微软雅黑"
 CHECKED_BOX = "\u2611"
 UNCHECKED_BOX = "\u2610"
@@ -369,19 +371,14 @@ class ReportBuilder:
         _add_risk_level_row(self.document, risk_level)
 
         _add_section_heading(self.document, "漏洞描述", level=3)
-        description = (
-            description
-            or "详细说明漏洞成因、触发条件。示例：被测系统登录接口未对输入参数进行过滤，攻击者可通过注入恶意SQL语句，绕过身份认证获取后台管理权限，进而访问敏感数据。"
-        )
-        desc_text = f"详细说明漏洞成因、触发条件，示例：{description}"
-        _add_body_text(self.document, desc_text)
+        _add_body_text(self.document, description or PLACEHOLDER_TEXT)
 
         _add_section_heading(self.document, "漏洞验证", level=3)
         self._add_verification_section(verify_steps, verify_result)
 
         _add_section_heading(self.document, "修复建议", level=3)
 
-        fix_suggestion = fix_suggestion or "（技术措施，待补充）"
+        fix_suggestion = fix_suggestion or PLACEHOLDER_TEXT
         priorities = ["紧急", "高", "中", "低"]
         priority_labels = {
             "紧急": "紧急（24h内）",
@@ -390,10 +387,7 @@ class ReportBuilder:
             "低": "低（下版本迭代）",
         }
 
-        _add_body_text(
-            self.document,
-            f"技术措施（可落地，如：对输入参数进行正则过滤，禁用危险SQL函数，使用预编译语句）：{fix_suggestion}",
-        )
+        _add_body_text(self.document, fix_suggestion)
 
         p_priority = self.document.add_paragraph()
         p_priority.paragraph_format.space_before = Pt(2)
@@ -407,20 +401,14 @@ class ReportBuilder:
                 _add_run(p_priority, "  ", size=10.5)
         _add_run(p_priority, "）", bold=False, size=10.5)
 
-        fix_verify = (
-            fix_verify
-            or "（整改验证方法，如：使用原测试工具+手工验证，无漏洞触发即为整改完成）"
-        )
-        _add_body_text(
-            self.document,
-            f"整改验证方法（如：使用原测试工具+手工验证，无漏洞触发即为整改完成）：{fix_verify}",
-        )
+        _add_section_heading(self.document, "整改验证方法", level=3)
+        _add_body_text(self.document, fix_verify or PLACEHOLDER_TEXT)
 
         _add_separator(self.document)
 
     def _add_verification_section(self, verify_steps, verify_result):
-        verify_steps = verify_steps or "（含Payload、操作流程，待补充）"
-        verify_result = verify_result or "（验证结果，待补充）"
+        verify_steps = verify_steps or PLACEHOLDER_TEXT
+        verify_result = verify_result or PLACEHOLDER_TEXT
 
         import re
 
@@ -448,19 +436,11 @@ class ReportBuilder:
                         os.path.join(base_dir, img_path) if base_dir else img_path
                     )
                     _add_image_to_doc(self.document, full_path)
-
-            _add_body_text(
-                self.document, "验证步骤（含Payload、操作流程）：见上方截图及描述"
-            )
         else:
-            _add_body_text(
-                self.document, f"验证步骤（含Payload、操作流程）：{verify_steps}"
-            )
+            _add_body_text(self.document, verify_steps)
 
-        _add_body_text(
-            self.document,
-            f"验证结果（如：成功获取管理员账号密码，截图见附件）：{verify_result}",
-        )
+        _add_section_heading(self.document, "验证结果", level=3)
+        _add_body_text(self.document, verify_result)
 
     def add_findings_section(self, findings):
         if not findings:
