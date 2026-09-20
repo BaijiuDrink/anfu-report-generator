@@ -20,7 +20,9 @@ from PySide6.QtWidgets import (
 
 from app_state import ProjectState
 from ui.dialogs.batch_add_dialog import BatchAddDialog
+from ui.dialogs.library_picker import LibraryPicker
 from ui.widgets.finding_editor import FindingEditor, FindingValidationError
+from vuln_manager import create_finding
 
 
 class FindingsListModel(QAbstractListModel):
@@ -169,6 +171,7 @@ class FindingsPage(QWidget):
         )
         self.new_button.clicked.connect(self.new_finding)
         self.library_button.clicked.connect(self.addFromLibraryRequested)
+        self.addFromLibraryRequested.connect(self.open_library_picker)
         self.batch_button.clicked.connect(self.open_batch_dialog)
         self.clear_button.clicked.connect(self.new_finding)
         self.save_button.clicked.connect(self.save_current)
@@ -331,6 +334,15 @@ class FindingsPage(QWidget):
             self._notify_mutation()
             self.editor.set_finding(self.state.findings[self.current_index])
             self._select_current_in_view()
+
+    def open_library_picker(self) -> None:
+        picker = LibraryPicker(self.vuln_manager, self)
+        if not picker.exec():
+            return
+        template = picker.selected_template()
+        if template:
+            finding = create_finding(self.vuln_manager, vuln_id=template["id"])
+            self.append_finding(finding, focus_address=True)
 
     def _notify_mutation(self) -> None:
         self.state.mark_dirty()
