@@ -66,6 +66,7 @@ env/
 # Project specific
 output/
 screenshots/
+.superpowers/
 
 # Office temp files
 ~$*.docx
