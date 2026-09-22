@@ -58,6 +58,48 @@ def test_word_fallback_replaces_blank_preview_with_high_resolution(monkeypatch):
     assert segments[0].size == (1600, 800)
 
 
+def test_mixed_html_and_image_prefers_ordered_html_segments(monkeypatch):
+    service = ClipboardService()
+    html = (
+        "<!--StartFragment-->before"
+        f"<img src='{png_data_uri((20, 10), (255, 0, 0, 255))}'>"
+        "after<!--EndFragment-->"
+    )
+
+    class MixedMimeData:
+        @staticmethod
+        def hasImage():
+            return True
+
+        @staticmethod
+        def imageData():
+            return object()
+
+        @staticmethod
+        def hasHtml():
+            return True
+
+        @staticmethod
+        def html():
+            return html
+
+        @staticmethod
+        def hasText():
+            return True
+
+    monkeypatch.setattr(
+        clipboard_module,
+        "_qimage_to_pillow",
+        lambda _value: Image.new("RGB", (100, 50), "blue"),
+    )
+
+    segments = service._read_qt_mime(MixedMimeData())
+
+    assert segments[0] == "before"
+    assert isinstance(segments[1], Image.Image)
+    assert segments[2] == "after"
+
+
 def test_windows_clipboard_is_closed_when_enumeration_raises(monkeypatch):
     events = []
 

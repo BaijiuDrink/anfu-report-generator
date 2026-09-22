@@ -1,6 +1,7 @@
 import pytest
 
 from app_state import ProjectState
+from ui.pages import findings_page as findings_page_module
 from ui.dialogs.batch_add_dialog import BatchAddDialog
 from ui.pages.findings_page import FindingsPage
 
@@ -47,6 +48,57 @@ def test_cancel_keeps_current_selection_and_edits(
     page.editor.name_edit.setText("edited")
     monkeypatch.setattr(page, "confirm_unsaved", lambda: "cancel")
     assert page.request_selection(1) is False
+    assert page.current_index == 0
+    assert page.editor.name_edit.text() == "edited"
+
+
+@pytest.mark.parametrize(
+    ("method_name", "dialog_name"),
+    [
+        ("open_library_picker", "LibraryPicker"),
+        ("open_batch_dialog", "BatchAddDialog"),
+    ],
+)
+def test_cancel_prevents_add_dialog_from_discarding_current_edit(
+    qtbot,
+    tmp_path,
+    vuln_manager,
+    monkeypatch,
+    method_name,
+    dialog_name,
+):
+    page = FindingsPage(tmp_path, vuln_manager)
+    qtbot.addWidget(page)
+    page.set_state(make_state())
+    page.request_selection(0)
+    page.editor.name_edit.setText("edited")
+    monkeypatch.setattr(page, "confirm_unsaved", lambda: "cancel")
+
+    def unexpected_dialog(*_args, **_kwargs):
+        pytest.fail("dialog opened after the user cancelled the unsaved-change prompt")
+
+    monkeypatch.setattr(findings_page_module, dialog_name, unexpected_dialog)
+
+    getattr(page, method_name)()
+
+    assert page.current_index == 0
+    assert page.editor.name_edit.text() == "edited"
+    assert page.state.findings[0]["name"] == "one"
+
+
+def test_cancel_prevents_copy_from_discarding_current_edit(
+    qtbot, tmp_path, vuln_manager, monkeypatch
+):
+    page = FindingsPage(tmp_path, vuln_manager)
+    qtbot.addWidget(page)
+    page.set_state(make_state())
+    page.request_selection(0)
+    page.editor.name_edit.setText("edited")
+    monkeypatch.setattr(page, "confirm_unsaved", lambda: "cancel")
+
+    page._copy_current()
+
+    assert len(page.state.findings) == 2
     assert page.current_index == 0
     assert page.editor.name_edit.text() == "edited"
 

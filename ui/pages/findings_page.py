@@ -327,6 +327,8 @@ class FindingsPage(QWidget):
         ]
 
     def open_batch_dialog(self) -> None:
+        if not self._resolve_unsaved_editor():
+            return
         dialog = BatchAddDialog(self.vuln_manager, self)
         if dialog.exec() and dialog.created_findings:
             self.state.findings.extend(copy.deepcopy(dialog.created_findings))
@@ -336,6 +338,8 @@ class FindingsPage(QWidget):
             self._select_current_in_view()
 
     def open_library_picker(self) -> None:
+        if not self._resolve_unsaved_editor():
+            return
         picker = LibraryPicker(self.vuln_manager, self)
         if not picker.exec():
             return
@@ -373,8 +377,22 @@ class FindingsPage(QWidget):
             self.move_finding(self.current_index, direction)
 
     def _copy_current(self) -> None:
-        if self.current_index is not None:
+        if self.current_index is not None and self._resolve_unsaved_editor():
             self.copy_finding(self.current_index)
+
+    def _resolve_unsaved_editor(self) -> bool:
+        if not self.editor.is_dirty():
+            return True
+        decision = self.confirm_unsaved()
+        if decision == "cancel":
+            return False
+        if decision == "save":
+            return self.save_current()
+        if self.current_index is None:
+            self.editor.clear_form()
+        elif 0 <= self.current_index < len(self.state.findings):
+            self.editor.set_finding(self.state.findings[self.current_index])
+        return True
 
     def _delete_current(self) -> None:
         if self.current_index is not None:

@@ -8,6 +8,7 @@ from PIL import Image
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QImage, QTextDocument, QTextImageFormat
 from PySide6.QtWidgets import QTextEdit
+from shiboken6 import isValid
 
 from services.clipboard_service import ClipboardSegment, ClipboardService
 
@@ -80,7 +81,10 @@ class EvidenceEditor(QTextEdit):
         return len(self._preview_urls)
 
     def clear(self) -> None:
+        old_document = self.document()
         self.setDocument(QTextDocument(self))
+        if isValid(old_document):
+            old_document.deleteLater()
         self._image_paths.clear()
         self._preview_urls.clear()
         self._missing_paths.clear()

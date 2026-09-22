@@ -237,11 +237,16 @@ class ClipboardService:
         if mime_data is None:
             return []
         try:
+            html_segments = []
+            if mime_data.hasHtml():
+                html_segments = parse_html_clipboard(mime_data.html())
+                if any(isinstance(segment, Image.Image) for segment in html_segments):
+                    return html_segments
             if mime_data.hasImage():
                 image = _qimage_to_pillow(mime_data.imageData())
                 return [image] if image is not None else []
-            if mime_data.hasHtml():
-                return parse_html_clipboard(mime_data.html())
+            if html_segments:
+                return html_segments
             if mime_data.hasText():
                 text = mime_data.text()
                 return [text] if text else []

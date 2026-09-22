@@ -1,4 +1,6 @@
 from PIL import Image
+from PySide6.QtCore import QCoreApplication, QEvent
+from PySide6.QtGui import QTextDocument
 
 from ui.widgets.evidence_editor import EvidenceEditor
 
@@ -50,3 +52,14 @@ def test_replacing_content_releases_previews_without_deleting_sources(qtbot, tmp
 
     assert editor.preview_resource_count() == 0
     assert all(path.exists() for path in paths)
+
+
+def test_repeated_clear_releases_old_qtext_documents(qtbot, tmp_path):
+    editor = EvidenceEditor(tmp_path)
+    qtbot.addWidget(editor)
+
+    for _ in range(10):
+        editor.clear()
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+
+    assert len(editor.findChildren(QTextDocument)) == 1
