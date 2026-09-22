@@ -52,3 +52,6 @@ jobs:
         print('✅ vuln_manager 导入成功')
         print('🎉 基本导入测试通过')
         "
+
+    - name: Build Windows executable
+      run: python -m PyInstaller --noconfirm --clean "安服报告生成工具.spec"

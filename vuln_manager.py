@@ -1,10 +1,35 @@
 import json
 import os
 import copy
+import shutil
+import sys
+from pathlib import Path
 
-DEFAULT_VULN_LIBRARY = os.path.join(
-    os.path.dirname(__file__), "vuln_library", "default_vulns.json"
+BUNDLED_VULN_LIBRARY = (
+    Path(__file__).resolve().parent / "vuln_library" / "default_vulns.json"
 )
+DEFAULT_VULN_LIBRARY = str(BUNDLED_VULN_LIBRARY)
+
+
+def _prepare_default_library():
+    if not getattr(sys, "frozen", False):
+        return DEFAULT_VULN_LIBRARY
+    root = Path(os.environ.get("LOCALAPPDATA", Path.home()))
+    destination = (
+        root
+        / "BaijiuDrink"
+        / "AnfuReportWorkbench"
+        / "vuln_library"
+        / "default_vulns.json"
+    )
+    if not destination.exists():
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if BUNDLED_VULN_LIBRARY.exists():
+            shutil.copy2(BUNDLED_VULN_LIBRARY, destination)
+        else:
+            destination.write_text('{"vulnerabilities": []}', encoding="utf-8")
+    return str(destination)
+
 
 RISK_LEVELS = ["严重", "高危", "中危", "低危", "信息"]
 FIX_PRIORITIES = ["紧急", "高", "中", "低"]
@@ -13,7 +38,7 @@ NETWORK_ZONES = ["互联网", "内网"]
 
 class VulnManager:
     def __init__(self, library_path=None):
-        self.library_path = library_path or DEFAULT_VULN_LIBRARY
+        self.library_path = library_path or _prepare_default_library()
         self.data = self._load()
 
     def _load(self):

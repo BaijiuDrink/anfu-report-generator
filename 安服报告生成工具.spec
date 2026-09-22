@@ -1,11 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from build_support import remove_colliding_system_dlls
+
 
 a = Analysis(
-    ['gui_app.py'],
+    ["gui_app.py"],
     pathex=[],
     binaries=[],
-    datas=[('vuln_library/default_vulns.json', 'vuln_library')],
+    datas=[("vuln_library/default_vulns.json", "vuln_library")],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -14,6 +16,7 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+a.binaries = remove_colliding_system_dlls(a.binaries)
 pyz = PYZ(a.pure)
 
 exe = EXE(
@@ -22,7 +25,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='安服报告生成工具',
+    name="安服报告生成工具",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
