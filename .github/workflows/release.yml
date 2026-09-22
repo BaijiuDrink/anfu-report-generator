@@ -1,0 +1,135 @@
+name: Release desktop builds
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+      - name: Test
+        run: python -m pytest -q
+      - name: Build Windows executable
+        run: python -m PyInstaller --noconfirm --clean "安服报告生成工具.spec"
+      - name: Smoke test Windows executable
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path "dist/安服报告生成工具.exe").Path
+          $started = Get-Date
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $parent = Start-Process -FilePath $exe -WindowStyle Hidden -PassThru
+          $processes = @()
+          try {
+            Start-Sleep -Seconds 12
+            if ($parent.HasExited) {
+              throw "Packaged application exited during startup"
+            }
+            $processes = Get-CimInstance Win32_Process | Where-Object {
+              $_.ExecutablePath -eq $exe -and $_.CreationDate -ge $started.AddSeconds(-2)
+            }
+            $qtModules = foreach ($process in $processes) {
+              Get-Process -Id $process.ProcessId -Module -ErrorAction SilentlyContinue |
+                Where-Object { $_.ModuleName -in "Qt6Core.dll", "Qt6Gui.dll", "Qt6Widgets.dll" }
+            }
+            if (($qtModules.ModuleName | Sort-Object -Unique).Count -lt 3) {
+              throw "Packaged application did not load the Qt GUI modules"
+            }
+          } finally {
+            foreach ($process in $processes) {
+              $verified = Get-CimInstance Win32_Process -Filter "ProcessId = $($process.ProcessId)" -ErrorAction SilentlyContinue
+              if ($verified -and $verified.ExecutablePath -eq $exe) {
+                Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
+              }
+            }
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: dist/安服报告生成工具.exe
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-22.04
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install Linux runtime and build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+      - name: Test
+        run: python -m pytest -q
+      - name: Build Linux executable
+        run: |
+          python -m PyInstaller --noconfirm --clean "安服报告生成工具.spec"
+          chmod +x dist/anfu-report-generator
+          tar -czf anfu-report-generator-linux-x86_64.tar.gz -C dist anfu-report-generator
+          mv anfu-report-generator-linux-x86_64.tar.gz dist/
+      - name: Build AppImage
+        run: |
+          chmod +x packaging/build_appimage.sh packaging/linux/AppRun
+          bash packaging/build_appimage.sh
+      - name: Smoke test Linux packages
+        run: |
+          set +e
+          QT_QPA_PLATFORM=offscreen timeout 12s dist/anfu-report-generator
+          raw_status=$?
+          QT_QPA_PLATFORM=offscreen APPIMAGE_EXTRACT_AND_RUN=1 timeout 20s dist/anfu-report-generator-x86_64.AppImage
+          appimage_status=$?
+          set -e
+          if [[ $raw_status -ne 124 ]]; then
+            echo "Linux executable exited unexpectedly with status $raw_status" >&2
+            exit 1
+          fi
+          if [[ $appimage_status -ne 124 ]]; then
+            echo "AppImage exited unexpectedly with status $appimage_status" >&2
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: |
+            dist/anfu-report-generator-x86_64.AppImage
+            dist/anfu-report-generator-linux-x86_64.tar.gz
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber

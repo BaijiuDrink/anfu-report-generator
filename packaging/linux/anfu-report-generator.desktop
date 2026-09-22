@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Anfu Report Workbench
+Comment=Pentest finding management and DOCX report generation
+Exec=anfu-report-generator
+Icon=anfu-report-generator
+Terminal=false
+Categories=Office;Utility;

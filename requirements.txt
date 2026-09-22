@@ -1,5 +1,5 @@
 python-docx>=0.8.11
 Pillow>=9.0.0
 PyYAML>=6.0
-pywin32>=300
+pywin32>=300; sys_platform == "win32"
 PySide6>=6.8,<7

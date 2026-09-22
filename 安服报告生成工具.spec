@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from build_support import remove_colliding_system_dlls
+from build_support import executable_name, remove_colliding_system_dlls
 
 
 a = Analysis(
@@ -25,7 +25,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="安服报告生成工具",
+    name=executable_name(),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
