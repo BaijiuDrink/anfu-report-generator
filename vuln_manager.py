@@ -11,6 +11,37 @@ BUNDLED_VULN_LIBRARY = (
 DEFAULT_VULN_LIBRARY = str(BUNDLED_VULN_LIBRARY)
 
 
+def _merge_default_templates(existing_data, bundled_data):
+    merged = copy.deepcopy(existing_data)
+    templates = merged.setdefault("vulnerabilities", [])
+    templates_by_id = {
+        template.get("id"): template for template in templates if template.get("id")
+    }
+    changed = False
+
+    for bundled in bundled_data.get("vulnerabilities", []):
+        vuln_id = bundled.get("id")
+        current = templates_by_id.get(vuln_id)
+        if current is None:
+            added = copy.deepcopy(bundled)
+            templates.append(added)
+            if vuln_id:
+                templates_by_id[vuln_id] = added
+            changed = True
+            continue
+
+        for field, value in bundled.items():
+            current_value = current.get(field)
+            is_empty = current_value is None or (
+                isinstance(current_value, str) and not current_value.strip()
+            )
+            if value not in (None, "") and is_empty:
+                current[field] = copy.deepcopy(value)
+                changed = True
+
+    return merged, changed
+
+
 def _prepare_default_library():
     if not getattr(sys, "frozen", False):
         return DEFAULT_VULN_LIBRARY
@@ -28,6 +59,15 @@ def _prepare_default_library():
             shutil.copy2(BUNDLED_VULN_LIBRARY, destination)
         else:
             destination.write_text('{"vulnerabilities": []}', encoding="utf-8")
+    elif BUNDLED_VULN_LIBRARY.exists():
+        with open(destination, "r", encoding="utf-8") as f:
+            existing_data = json.load(f)
+        with open(BUNDLED_VULN_LIBRARY, "r", encoding="utf-8") as f:
+            bundled_data = json.load(f)
+        merged_data, changed = _merge_default_templates(existing_data, bundled_data)
+        if changed:
+            with open(destination, "w", encoding="utf-8") as f:
+                json.dump(merged_data, f, ensure_ascii=False, indent=2)
     return str(destination)
 
 
