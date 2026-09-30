@@ -136,6 +136,23 @@ def test_relink_keeps_identity_and_changes_scan_directory(tmp_path):
     assert updated.original_dir == other.resolve()
 
 
+def test_relink_to_recorded_file_does_not_duplicate_history(tmp_path):
+    from services.project_history import ProjectHistory
+
+    history = ProjectHistory(tmp_path / "history.json")
+    first_path = tmp_path / "first.json"
+    second_path = tmp_path / "second.json"
+    for path in (first_path, second_path):
+        path.write_text('{"project_name":"示例","findings":[]}', encoding="utf-8")
+    first = history.record(first_path, "示例")
+    history.record(second_path, "示例")
+
+    history.relink(first.record_id, second_path, "示例")
+
+    assert len(history.entries()) == 1
+    assert history.entries()[0].record_id == first.record_id
+
+
 def test_latest_project_appears_first(tmp_path):
     from services.project_history import ProjectHistory
 
@@ -146,6 +163,16 @@ def test_latest_project_appears_first(tmp_path):
         history.record(path, name)
 
     assert [entry.name for entry in history.entries()] == ["second", "first"]
+
+
+def test_blank_project_name_uses_json_filename(tmp_path):
+    from services.project_history import ProjectHistory
+
+    project = tmp_path / "customer-a.json"
+    project.write_text('{"project_name":"","findings":[]}', encoding="utf-8")
+    history = ProjectHistory(tmp_path / "history.json")
+
+    assert history.record(project, "").name == "customer-a"
 
 
 def test_refresh_does_not_follow_symlink_outside_original_dir(tmp_path):
@@ -187,3 +214,78 @@ def test_unavailable_original_directory_keeps_missing_status(tmp_path, monkeypat
     monkeypatch.setattr(Path, "glob", glob)
 
     assert history.refresh()[0].missing is True
+
+
+def test_corrupt_index_without_backup_permission_is_not_overwritten(
+    tmp_path, monkeypatch
+):
+    from services.project_history import ProjectHistory
+
+    index = tmp_path / "history.json"
+    index.write_bytes(b"{broken")
+
+    def denied(*_args):
+        raise OSError("backup denied")
+
+    monkeypatch.setattr("services.project_history.shutil.copy2", denied)
+    history = ProjectHistory(index)
+    project = tmp_path / "project.json"
+    project.write_text('{"project_name":"示例","findings":[]}', encoding="utf-8")
+
+    with pytest.raises(OSError, match="preserved"):
+        history.record(project, "示例")
+    assert index.read_bytes() == b"{broken"
+
+
+def test_invalid_timestamp_in_history_is_treated_as_corrupt(tmp_path):
+    from services.project_history import ProjectHistory
+
+    index = tmp_path / "history.json"
+    index.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "projects": [
+                    {
+                        "record_id": "one",
+                        "name": "示例",
+                        "path": str(tmp_path / "project.json"),
+                        "original_dir": str(tmp_path),
+                        "digest": "abc",
+                        "last_opened": "not-a-date",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert ProjectHistory(index).entries() == []
+    assert len(list(tmp_path.glob("history.json.corrupt*"))) == 1
+
+
+def test_mismatched_original_directory_is_not_scanned(tmp_path):
+    from services.project_history import ProjectHistory
+
+    index = tmp_path / "history.json"
+    index.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "projects": [
+                    {
+                        "record_id": "one",
+                        "name": "示例",
+                        "path": str(tmp_path / "project.json"),
+                        "original_dir": str(tmp_path / "unrelated"),
+                        "digest": "abc",
+                        "last_opened": "2026-10-01T09:00:00+00:00",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert ProjectHistory(index).entries() == []
+    assert len(list(tmp_path.glob("history.json.corrupt*"))) == 1

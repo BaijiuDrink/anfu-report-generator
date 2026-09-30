@@ -31,6 +31,7 @@ class ProjectHistory:
     def __init__(self, index_path: Path | None = None):
         data_dir = QStandardPaths.writableLocation(QStandardPaths.AppLocalDataLocation)
         self.index_path = Path(index_path or Path(data_dir) / "recent-projects.json")
+        self._can_write = True
         self._projects = self._load()
 
     def _load(self) -> list[RecentProject]:
@@ -44,25 +45,41 @@ class ProjectHistory:
                 or not isinstance(payload.get("projects"), list)
             ):
                 raise ValueError("Unsupported recent-project index version")
-            return [
-                RecentProject(
-                    record_id=item["record_id"],
-                    name=item["name"],
-                    path=Path(item["path"]),
-                    original_dir=Path(item["original_dir"]),
-                    digest=item["digest"],
-                    last_opened=item["last_opened"],
+            projects = []
+            for item in payload["projects"]:
+                path = Path(item["path"])
+                original_dir = Path(item["original_dir"])
+                if (
+                    not path.is_absolute()
+                    or not original_dir.is_absolute()
+                    or path.parent != original_dir
+                ):
+                    raise ValueError("Invalid recent-project directory")
+                datetime.fromisoformat(item["last_opened"])
+                projects.append(
+                    RecentProject(
+                        record_id=item["record_id"],
+                        name=item["name"],
+                        path=path,
+                        original_dir=original_dir,
+                        digest=item["digest"],
+                        last_opened=item["last_opened"],
+                    )
                 )
-                for item in payload["projects"]
-            ]
+            return projects
         except (OSError, UnicodeError, ValueError, TypeError, KeyError):
             backup = self.index_path.with_name(
                 f"{self.index_path.name}.corrupt-{uuid4().hex}"
             )
-            shutil.copy2(self.index_path, backup)
+            try:
+                shutil.copy2(self.index_path, backup)
+            except OSError:
+                self._can_write = False
             return []
 
     def _save(self) -> None:
+        if not self._can_write:
+            raise OSError("history index preserved because backup failed")
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "version": 1,
@@ -108,14 +125,16 @@ class ProjectHistory:
         path = Path(path).resolve()
         project = replace(
             previous,
-            name=name,
+            name=name.strip() or path.stem,
             path=path,
             original_dir=path.parent,
             digest=hashlib.sha256(path.read_bytes()).hexdigest(),
             last_opened=datetime.now(timezone.utc).isoformat(),
         )
         self._projects = [project] + [
-            item for item in self._projects if item.record_id != record_id
+            item
+            for item in self._projects
+            if item.record_id != record_id and item.path != path
         ]
         self._save()
         return project
@@ -125,7 +144,7 @@ class ProjectHistory:
         previous = next((item for item in self._projects if item.path == path), None)
         project = RecentProject(
             record_id=previous.record_id if previous else str(uuid4()),
-            name=name,
+            name=name.strip() or path.stem,
             path=path,
             original_dir=path.parent,
             digest=hashlib.sha256(path.read_bytes()).hexdigest(),
