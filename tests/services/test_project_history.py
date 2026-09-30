@@ -289,3 +289,93 @@ def test_mismatched_original_directory_is_not_scanned(tmp_path):
 
     assert ProjectHistory(index).entries() == []
     assert len(list(tmp_path.glob("history.json.corrupt*"))) == 1
+
+
+def test_identical_recorded_sibling_is_not_mistaken_for_moved_project(tmp_path):
+    from services.project_history import ProjectHistory
+
+    history = ProjectHistory(tmp_path / "history.json")
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+    first.write_text('{"project_name":"示例","findings":[]}', encoding="utf-8")
+    second.write_bytes(first.read_bytes())
+    first_entry = history.record(first, "第一个")
+    history.record(second, "第二个")
+    moved_dir = tmp_path / "moved"
+    moved_dir.mkdir()
+    first.rename(moved_dir / first.name)
+
+    history.refresh()
+
+    assert history.get(first_entry.record_id).missing is True
+    assert history.get(first_entry.record_id).path == first.resolve()
+
+
+@pytest.mark.parametrize("operation", ["record", "relink", "forget", "refresh"])
+def test_failed_index_write_does_not_change_memory(tmp_path, monkeypatch, operation):
+    from services.project_history import ProjectHistory
+
+    history = ProjectHistory(tmp_path / "history.json")
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+    first.write_text('{"project_name":"示例","findings":[]}', encoding="utf-8")
+    second.write_text('{"project_name":"另一个","findings":[]}', encoding="utf-8")
+    entry = history.record(first, "原记录")
+    before = history.entries()
+    if operation == "refresh":
+        first.rename(tmp_path / "renamed.json")
+
+    def denied(*_args, **_kwargs):
+        raise OSError("index denied")
+
+    monkeypatch.setattr("services.project_history.os.replace", denied)
+    with pytest.raises(OSError, match="index denied"):
+        if operation == "record":
+            history.record(second, "新记录")
+        elif operation == "relink":
+            history.relink(entry.record_id, second, "新记录")
+        elif operation == "forget":
+            history.forget(entry.record_id)
+        else:
+            history.refresh()
+
+    assert history.entries() == before
+
+
+def test_redirected_original_directory_stays_missing(tmp_path, monkeypatch):
+    from services.project_history import ProjectHistory
+
+    original_dir = tmp_path / "original"
+    original_dir.mkdir()
+    original = original_dir / "project.json"
+    original.write_text('{"project_name":"示例","findings":[]}', encoding="utf-8")
+    history = ProjectHistory(tmp_path / "history.json")
+    entry = history.record(original, "示例")
+    real_resolve = Path.resolve
+
+    def redirected(path, *args, **kwargs):
+        if path == original_dir:
+            return tmp_path / "elsewhere"
+        return real_resolve(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", redirected)
+
+    assert entry.missing is True
+    assert history.refresh()[0].missing is True
+
+
+def test_old_index_without_file_identity_requires_manual_relink(tmp_path):
+    from services.project_history import ProjectHistory
+
+    original = tmp_path / "original.json"
+    original.write_text('{"project_name":"示例","findings":[]}', encoding="utf-8")
+    history = ProjectHistory(tmp_path / "history.json")
+    history.record(original, "示例")
+    payload = json.loads((tmp_path / "history.json").read_text(encoding="utf-8"))
+    del payload["projects"][0]["file_id"]
+    (tmp_path / "history.json").write_text(json.dumps(payload), encoding="utf-8")
+    original.rename(tmp_path / "renamed.json")
+
+    reloaded = ProjectHistory(tmp_path / "history.json")
+
+    assert reloaded.refresh()[0].missing is True

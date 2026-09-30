@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QSignalSpy
 
@@ -80,3 +82,19 @@ def test_empty_history_state(qtbot):
 
     assert page.empty_label.isVisibleTo(page)
     assert not page.open_button.isEnabled()
+
+
+def test_recent_open_time_is_displayed_in_local_timezone(qtbot, tmp_path):
+    from ui.pages.projects_page import ProjectsPage
+
+    project = make_project(tmp_path)
+    expected = (
+        datetime.fromisoformat(project.last_opened)
+        .astimezone()
+        .strftime("%Y-%m-%d %H:%M")
+    )
+    page = ProjectsPage()
+    qtbot.addWidget(page)
+    page.set_projects([project])
+
+    assert f"最近打开 {expected}" in page.list_widget.item(0).text()

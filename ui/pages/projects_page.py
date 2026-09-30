@@ -101,8 +101,10 @@ class ProjectsPage(QWidget):
             if keyword and keyword not in f"{project.name} {project.path}".casefold():
                 continue
             status = " · JSON 文件已移动" if project.missing else ""
-            opened = datetime.fromisoformat(project.last_opened).strftime(
-                "%Y-%m-%d %H:%M"
+            opened = (
+                datetime.fromisoformat(project.last_opened)
+                .astimezone()
+                .strftime("%Y-%m-%d %H:%M")
             )
             item = QListWidgetItem(
                 f"{project.name}{status}\n{project.path}\n最近打开 {opened}"

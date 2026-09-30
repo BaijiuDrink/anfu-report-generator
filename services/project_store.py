@@ -22,7 +22,14 @@ class ProjectStore:
     def load(self, path: Path) -> LoadedProject:
         path = Path(path).resolve()
         payload = json.loads(path.read_text(encoding="utf-8"))
-        findings = copy.deepcopy(payload.get("findings", []))
+        if (
+            not isinstance(payload, dict)
+            or not isinstance(payload.get("project_name"), str)
+            or not isinstance(payload.get("findings"), list)
+            or any(not isinstance(item, dict) for item in payload["findings"])
+        ):
+            raise ValueError("Invalid project JSON structure")
+        findings = copy.deepcopy(payload["findings"])
         for finding in findings:
             finding["verify_steps"] = self._replace_paths(
                 finding.get("verify_steps", ""),

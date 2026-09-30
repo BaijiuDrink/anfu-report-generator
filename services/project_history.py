@@ -21,10 +21,23 @@ class RecentProject:
     original_dir: Path
     digest: str
     last_opened: str
+    file_id: str | None = None
 
     @property
     def missing(self) -> bool:
-        return not self.path.is_file()
+        try:
+            return (
+                not self.path.is_file()
+                or self.original_dir.resolve() != self.original_dir
+                or self.path.resolve() != self.path
+            )
+        except (OSError, RuntimeError):
+            return True
+
+
+def _file_id(path: Path) -> str | None:
+    stat = path.stat()
+    return f"{stat.st_dev}:{stat.st_ino}" if stat.st_ino else None
 
 
 class ProjectHistory:
@@ -64,6 +77,7 @@ class ProjectHistory:
                         original_dir=original_dir,
                         digest=item["digest"],
                         last_opened=item["last_opened"],
+                        file_id=item.get("file_id"),
                     )
                 )
             return projects
@@ -77,7 +91,7 @@ class ProjectHistory:
                 self._can_write = False
             return []
 
-    def _save(self) -> None:
+    def _save(self, projects: list[RecentProject]) -> None:
         if not self._can_write:
             raise OSError("history index preserved because backup failed")
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
@@ -89,7 +103,7 @@ class ProjectHistory:
                     "path": str(project.path),
                     "original_dir": str(project.original_dir),
                 }
-                for project in self._projects
+                for project in projects
             ],
         }
         temporary = None
@@ -113,10 +127,9 @@ class ProjectHistory:
         )
 
     def forget(self, record_id: str) -> None:
-        self._projects = [
-            item for item in self._projects if item.record_id != record_id
-        ]
-        self._save()
+        projects = [item for item in self._projects if item.record_id != record_id]
+        self._save(projects)
+        self._projects = projects
 
     def relink(self, record_id: str, path: Path, name: str) -> RecentProject:
         previous = self.get(record_id)
@@ -130,13 +143,15 @@ class ProjectHistory:
             original_dir=path.parent,
             digest=hashlib.sha256(path.read_bytes()).hexdigest(),
             last_opened=datetime.now(timezone.utc).isoformat(),
+            file_id=_file_id(path),
         )
-        self._projects = [project] + [
+        projects = [project] + [
             item
             for item in self._projects
             if item.record_id != record_id and item.path != path
         ]
-        self._save()
+        self._save(projects)
+        self._projects = projects
         return project
 
     def record(self, path: Path, name: str) -> RecentProject:
@@ -149,11 +164,13 @@ class ProjectHistory:
             original_dir=path.parent,
             digest=hashlib.sha256(path.read_bytes()).hexdigest(),
             last_opened=datetime.now(timezone.utc).isoformat(),
+            file_id=_file_id(path),
         )
-        self._projects = [project] + [
+        projects = [project] + [
             item for item in self._projects if item.record_id != project.record_id
         ]
-        self._save()
+        self._save(projects)
+        self._projects = projects
         return project
 
     def refresh(self) -> list[RecentProject]:
@@ -165,6 +182,12 @@ class ProjectHistory:
                 continue
             matches = []
             try:
+                if (
+                    project.file_id is None
+                    or project.original_dir.resolve() != project.original_dir
+                ):
+                    refreshed.append(project)
+                    continue
                 for candidate in project.original_dir.glob("*.json"):
                     try:
                         if (
@@ -181,10 +204,19 @@ class ProjectHistory:
             except OSError:
                 matches = []
             if len(matches) == 1:
-                project = replace(project, path=matches[0].resolve())
-                changed = True
+                candidate = matches[0]
+                try:
+                    owned_by_other = any(
+                        item.record_id != project.record_id and item.path == candidate
+                        for item in self._projects
+                    )
+                    if not owned_by_other and _file_id(candidate) == project.file_id:
+                        project = replace(project, path=candidate.resolve())
+                        changed = True
+                except OSError:
+                    pass
             refreshed.append(project)
-        self._projects = refreshed
         if changed:
-            self._save()
+            self._save(refreshed)
+            self._projects = refreshed
         return self.entries()
