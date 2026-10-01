@@ -38,6 +38,18 @@ def test_copy_move_and_search(qtbot, tmp_path, vuln_manager):
     assert page.visible_finding_names() == ["two"]
 
 
+def test_risk_chips_filter_findings(qtbot, tmp_path, vuln_manager):
+    page = FindingsPage(tmp_path, vuln_manager)
+    qtbot.addWidget(page)
+    page.set_state(make_state())
+
+    page.filter_buttons["高危"].click()
+    assert page.visible_finding_names() == ["two"]
+
+    page.filter_buttons["全部"].click()
+    assert page.visible_finding_names() == ["one", "two"]
+
+
 def test_cancel_keeps_current_selection_and_edits(
     qtbot, tmp_path, vuln_manager, monkeypatch
 ):

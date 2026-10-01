@@ -4,14 +4,17 @@ import copy
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QPlainTextEdit,
-    QRadioButton,
+    QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -33,6 +36,7 @@ STANDARD_FIELDS = {
     "risk_level",
     "description",
     "verify_steps",
+    "poc_exp",
     "verify_result",
     "fix_suggestion",
     "fix_priority",
@@ -61,57 +65,93 @@ class FindingEditor(QWidget):
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        header = QWidget()
+        header.setObjectName("editorHeader")
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(20, 12, 20, 12)
+        heading = QVBoxLayout()
+        heading.setSpacing(1)
+        self.editor_title = QLabel("新建漏洞")
+        self.editor_title.setObjectName("editorTitle")
+        self.editor_meta = QLabel("新建记录")
+        self.editor_meta.setObjectName("editorMeta")
+        heading.addWidget(self.editor_title)
+        heading.addWidget(self.editor_meta)
+        header_layout.addLayout(heading)
+        header_layout.addStretch(1)
+        risk_label = QLabel("风险等级")
+        risk_label.setObjectName("editorMeta")
+        header_layout.addWidget(risk_label)
+        risk_widget, self.risk_group = self._radio_field(
+            ["严重", "高危", "中危", "低危", "信息"], "riskChoice"
+        )
+        header_layout.addWidget(risk_widget)
+        root.addWidget(header)
+
         scroll = QScrollArea()
+        scroll.setObjectName("editorScroll")
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         form_widget = QWidget()
+        form_widget.setObjectName("editorCanvas")
         self.form_layout = QVBoxLayout(form_widget)
-        self.form_layout.setContentsMargins(16, 16, 16, 16)
-        self.form_layout.setSpacing(14)
+        self.form_layout.setContentsMargins(20, 16, 20, 24)
+        self.form_layout.setSpacing(16)
         scroll.setWidget(form_widget)
         root.addWidget(scroll)
 
         basic = QGroupBox("基本信息")
-        basic_form = QFormLayout(basic)
-        basic_form.setLabelAlignment(Qt.AlignTop)
+        basic_form = QGridLayout(basic)
+        basic_form.setContentsMargins(14, 12, 14, 14)
+        basic_form.setHorizontalSpacing(16)
+        basic_form.setVerticalSpacing(7)
+        basic_form.setColumnStretch(0, 1)
+        basic_form.setColumnStretch(1, 1)
         self.name_edit = QLineEdit()
         self.name_edit.setPlaceholderText("请输入漏洞名称")
         self.url_edit = self._plain_text(88, "每行一个漏洞地址或受影响主机")
         zone_widget, self.zone_group = self._radio_field(["互联网", "内网"])
-        risk_widget, self.risk_group = self._radio_field(
-            ["严重", "高危", "中危", "低危", "信息"]
-        )
         priority_widget, self.priority_group = self._radio_field(
             ["紧急", "高", "中", "低"]
         )
-        basic_form.addRow("漏洞名称", self.name_edit)
-        basic_form.addRow("漏洞地址", self.url_edit)
-        basic_form.addRow("网络区域", zone_widget)
-        basic_form.addRow("风险等级", risk_widget)
-        basic_form.addRow("修复优先级", priority_widget)
+        basic_form.addWidget(self._field_label("漏洞名称 *"), 0, 0)
+        basic_form.addWidget(self._field_label("网络区域"), 0, 1)
+        basic_form.addWidget(self.name_edit, 1, 0)
+        basic_form.addWidget(zone_widget, 1, 1)
+        basic_form.addWidget(self._field_label("漏洞地址"), 2, 0, 1, 2)
+        basic_form.addWidget(self.url_edit, 3, 0, 1, 2)
+        basic_form.addWidget(self._field_label("修复优先级"), 4, 0, 1, 2)
+        basic_form.addWidget(priority_widget, 5, 0, 1, 2)
         self.form_layout.addWidget(basic)
 
         content = QGroupBox("漏洞内容")
         content_form = QFormLayout(content)
-        content_form.setLabelAlignment(Qt.AlignTop)
+        content_form.setRowWrapPolicy(QFormLayout.WrapAllRows)
         self.description_edit = self._plain_text(130, "说明漏洞成因、触发条件和影响")
         content_form.addRow("漏洞描述", self.description_edit)
         self.form_layout.addWidget(content)
 
         verification = QGroupBox("验证证据")
         verification_form = QFormLayout(verification)
-        verification_form.setLabelAlignment(Qt.AlignTop)
+        verification_form.setRowWrapPolicy(QFormLayout.WrapAllRows)
         self.evidence_edit = EvidenceEditor(self.screenshot_dir)
         self.evidence_edit.setMinimumHeight(220)
         self.evidence_edit.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.poc_exp_edit = self._plain_text(
+            140, "粘贴或填写 POC / EXP 代码、命令（选填）"
+        )
+        self.poc_exp_edit.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self.poc_exp_edit.setLineWrapMode(QPlainTextEdit.NoWrap)
         self.verify_result_edit = self._plain_text(100, "填写验证结论")
         verification_form.addRow("漏洞验证", self.evidence_edit)
+        verification_form.addRow("POC / EXP", self.poc_exp_edit)
         verification_form.addRow("验证结果", self.verify_result_edit)
         self.form_layout.addWidget(verification)
 
         remediation = QGroupBox("整改建议")
         remediation_form = QFormLayout(remediation)
-        remediation_form.setLabelAlignment(Qt.AlignTop)
+        remediation_form.setRowWrapPolicy(QFormLayout.WrapAllRows)
         self.fix_suggestion_edit = self._plain_text(130, "填写可落地的修复措施")
         self.fix_verify_edit = self._plain_text(110, "填写整改后的验证方法")
         remediation_form.addRow("修复建议", self.fix_suggestion_edit)
@@ -128,14 +168,25 @@ class FindingEditor(QWidget):
         return editor
 
     @staticmethod
-    def _radio_field(values: list[str]) -> tuple[QWidget, QButtonGroup]:
+    def _field_label(text: str) -> QLabel:
+        label = QLabel(text)
+        label.setObjectName("fieldLabel")
+        return label
+
+    @staticmethod
+    def _radio_field(
+        values: list[str], object_name: str = "pillChoice"
+    ) -> tuple[QWidget, QButtonGroup]:
         widget = QWidget()
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
         group = QButtonGroup(widget)
         for value in values:
-            button = QRadioButton(value)
+            button = QPushButton(value)
+            button.setCheckable(True)
             button.setProperty("value", value)
+            button.setObjectName(object_name)
             group.addButton(button)
             layout.addWidget(button)
         layout.addStretch(1)
@@ -143,10 +194,12 @@ class FindingEditor(QWidget):
 
     def _connect_dirty_signals(self) -> None:
         self.name_edit.textChanged.connect(self._mark_from_user)
+        self.name_edit.textChanged.connect(self._update_heading)
         for editor in (
             self.url_edit,
             self.description_edit,
             self.evidence_edit,
+            self.poc_exp_edit,
             self.verify_result_edit,
             self.fix_suggestion_edit,
             self.fix_verify_edit,
@@ -158,6 +211,9 @@ class FindingEditor(QWidget):
     def _mark_from_user(self, *_args) -> None:
         if not self._loading:
             self._set_dirty(True)
+
+    def _update_heading(self, *_args) -> None:
+        self.editor_title.setText(self.name_edit.text().strip() or "新建漏洞")
 
     def _on_button_toggled(self, _button, checked: bool) -> None:
         if checked:
@@ -183,6 +239,11 @@ class FindingEditor(QWidget):
         self._loading = True
         try:
             self.vuln_id = data.get("vuln_id")
+            self.editor_meta.setText(
+                str(self.vuln_id)
+                if self.vuln_id
+                else ("已录入漏洞" if data.get("name") else "新建记录")
+            )
             self._extra_fields = {
                 key: value for key, value in data.items() if key not in STANDARD_FIELDS
             }
@@ -202,6 +263,7 @@ class FindingEditor(QWidget):
             )
             self.description_edit.setPlainText(data.get("description", "") or "")
             self.evidence_edit.set_marker_text(data.get("verify_steps", "") or "")
+            self.poc_exp_edit.setPlainText(data.get("poc_exp", "") or "")
             self.verify_result_edit.setPlainText(data.get("verify_result", "") or "")
             self.fix_suggestion_edit.setPlainText(data.get("fix_suggestion", "") or "")
             self.fix_verify_edit.setPlainText(data.get("fix_verify", "") or "")
@@ -222,6 +284,7 @@ class FindingEditor(QWidget):
                 "risk_level": self.risk_group.checkedButton().property("value"),
                 "description": self.description_edit.toPlainText().strip(),
                 "verify_steps": self.evidence_edit.marker_text(),
+                "poc_exp": self.poc_exp_edit.toPlainText(),
                 "verify_result": self.verify_result_edit.toPlainText().strip(),
                 "fix_suggestion": self.fix_suggestion_edit.toPlainText().strip(),
                 "fix_priority": self.priority_group.checkedButton().property("value"),

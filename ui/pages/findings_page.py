@@ -3,7 +3,8 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 
-from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt, Signal
+from PySide6.QtCore import QAbstractListModel, QModelIndex, QRect, QSize, Qt, Signal
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFrame,
@@ -14,6 +15,8 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSplitter,
+    QStyledItemDelegate,
+    QStyle,
     QVBoxLayout,
     QWidget,
 )
@@ -30,6 +33,7 @@ class FindingsListModel(QAbstractListModel):
         super().__init__(parent)
         self.state = state or ProjectState()
         self.search_text = ""
+        self.risk_filter = "全部"
         self._visible_indices: list[int] = []
         self.refresh()
 
@@ -52,6 +56,8 @@ class FindingsListModel(QAbstractListModel):
             return f"{name}\n{risk} · {zone} · {address}"
         if role == Qt.UserRole:
             return self._visible_indices[index.row()]
+        if role == Qt.UserRole + 1:
+            return finding
         return None
 
     def refresh(self) -> None:
@@ -62,7 +68,10 @@ class FindingsListModel(QAbstractListModel):
             searchable = " ".join(
                 str(finding.get(key, "")) for key in ("name", "url", "network_zone")
             ).casefold()
-            if not keyword or keyword in searchable:
+            if (not keyword or keyword in searchable) and (
+                self.risk_filter == "全部"
+                or finding.get("risk_level", "中危") == self.risk_filter
+            ):
                 self._visible_indices.append(index)
         self.endResetModel()
 
@@ -72,6 +81,10 @@ class FindingsListModel(QAbstractListModel):
 
     def set_search_text(self, text: str) -> None:
         self.search_text = text
+        self.refresh()
+
+    def set_risk_filter(self, risk: str) -> None:
+        self.risk_filter = risk
         self.refresh()
 
     def finding_index(self, row: int) -> int | None:
@@ -84,6 +97,72 @@ class FindingsListModel(QAbstractListModel):
             return self._visible_indices.index(finding_index)
         except ValueError:
             return None
+
+
+RISK_COLORS = {
+    "严重": ("#c92324", "#fde2df", "#901114"),
+    "高危": ("#c35600", "#ffe6d6", "#893500"),
+    "中危": ("#aa7e00", "#fbedd1", "#694a00"),
+    "低危": ("#3082b5", "#e0edf8", "#0d5279"),
+    "信息": ("#81878d", "#e9edf2", "#4a5158"),
+}
+
+
+class FindingItemDelegate(QStyledItemDelegate):
+    def sizeHint(self, option, index):
+        return QSize(option.rect.width(), 68)
+
+    def paint(self, painter: QPainter, option, index) -> None:
+        finding = index.data(Qt.UserRole + 1) or {}
+        name = finding.get("name") or "未命名漏洞"
+        risk = finding.get("risk_level") or "中危"
+        zone = finding.get("network_zone") or "互联网"
+        address = (finding.get("url") or "未填写地址").splitlines()[0]
+        bar, badge_bg, badge_fg = RISK_COLORS.get(risk, RISK_COLORS["信息"])
+        rect = option.rect.adjusted(5, 3, -5, -3)
+
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing)
+        selected = bool(option.state & QStyle.State_Selected)
+        painter.setPen(QPen(QColor("#c0bdb7" if selected else "#fdfcf9")))
+        painter.setBrush(QColor("#f8f7f3" if selected else "#fdfcf9"))
+        painter.drawRoundedRect(rect, 6, 6)
+        painter.fillRect(
+            QRect(rect.left(), rect.top() + 2, 3, rect.height() - 4), QColor(bar)
+        )
+
+        badge = QRect(rect.right() - 48, rect.top() + 9, 38, 20)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(badge_bg))
+        painter.drawRoundedRect(badge, 10, 10)
+        painter.setPen(QColor(badge_fg))
+        painter.drawText(badge, Qt.AlignCenter, risk)
+
+        name_rect = QRect(rect.left() + 12, rect.top() + 8, rect.width() - 75, 22)
+        font = QFont(option.font)
+        font.setWeight(QFont.DemiBold)
+        painter.setFont(font)
+        painter.setPen(QColor("#202730"))
+        painter.drawText(
+            name_rect,
+            Qt.AlignVCenter,
+            painter.fontMetrics().elidedText(name, Qt.ElideRight, name_rect.width()),
+        )
+
+        detail_rect = QRect(rect.left() + 12, rect.top() + 36, rect.width() - 24, 18)
+        font.setWeight(QFont.Normal)
+        font.setPointSize(max(8, font.pointSize() - 1))
+        painter.setFont(font)
+        painter.setPen(QColor("#7b8187"))
+        detail = f"{zone} · {address}"
+        painter.drawText(
+            detail_rect,
+            Qt.AlignVCenter,
+            painter.fontMetrics().elidedText(
+                detail, Qt.ElideRight, detail_rect.width()
+            ),
+        )
+        painter.restore()
 
 
 class FindingsPage(QWidget):
@@ -109,27 +188,56 @@ class FindingsPage(QWidget):
         left = QFrame()
         left.setObjectName("findingsPanel")
         left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(10, 14, 10, 10)
+        left_layout.setSpacing(8)
+        left.setMinimumWidth(248)
+        heading_row = QHBoxLayout()
         title = QLabel("漏洞列表")
         title.setObjectName("pageSectionTitle")
-        left_layout.addWidget(title)
+        heading_row.addWidget(title)
+        heading_row.addStretch(1)
+        self.list_count = QLabel("0 条")
+        self.list_count.setObjectName("listCount")
+        heading_row.addWidget(self.list_count)
+        left_layout.addLayout(heading_row)
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText("搜索名称、地址或网络区域")
         left_layout.addWidget(self.search_edit)
 
+        self.filter_buttons = {}
+        for risks in (("全部", "严重", "高危"), ("中危", "低危", "信息")):
+            filter_row = QHBoxLayout()
+            filter_row.setSpacing(4)
+            for risk in risks:
+                button = QPushButton(risk)
+                button.setObjectName("filterChip")
+                button.setCheckable(True)
+                button.setChecked(risk == "全部")
+                button.clicked.connect(
+                    lambda _checked=False, value=risk: self._filter_risk(value)
+                )
+                self.filter_buttons[risk] = button
+                filter_row.addWidget(button)
+            filter_row.addStretch(1)
+            left_layout.addLayout(filter_row)
+
+        self.list_view = QListView()
+        self.list_view.setObjectName("findingsList")
+        self.list_view.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.model = FindingsListModel(self.state, self)
+        self.list_view.setModel(self.model)
+        self.list_view.setItemDelegate(FindingItemDelegate(self.list_view))
+        left_layout.addWidget(self.list_view, 1)
+
         create_row = QHBoxLayout()
         self.new_button = QPushButton("新建漏洞")
+        self.new_button.setObjectName("primaryButton")
         self.library_button = QPushButton("从漏洞库添加")
         create_row.addWidget(self.new_button)
         create_row.addWidget(self.library_button)
         left_layout.addLayout(create_row)
         self.batch_button = QPushButton("批量录入")
         left_layout.addWidget(self.batch_button)
-
-        self.list_view = QListView()
-        self.list_view.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.model = FindingsListModel(self.state, self)
-        self.list_view.setModel(self.model)
-        left_layout.addWidget(self.list_view, 1)
 
         action_row = QHBoxLayout()
         self.up_button = QPushButton("上移")
@@ -146,26 +254,34 @@ class FindingsPage(QWidget):
         left_layout.addLayout(action_row)
 
         right = QFrame()
+        right.setObjectName("editorPanel")
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
         self.editor = FindingEditor(self.screenshots_dir)
         right_layout.addWidget(self.editor, 1)
-        editor_actions = QHBoxLayout()
+        editor_foot = QFrame()
+        editor_foot.setObjectName("editorFoot")
+        editor_actions = QHBoxLayout(editor_foot)
+        editor_actions.setContentsMargins(20, 10, 20, 10)
+        self.editor_hint = QLabel("更改将在保存项目时写入文件")
+        self.editor_hint.setObjectName("editorHint")
+        editor_actions.addWidget(self.editor_hint)
         editor_actions.addStretch(1)
         self.clear_button = QPushButton("清空表单")
         self.save_button = QPushButton("保存漏洞")
         self.save_button.setObjectName("primaryButton")
         editor_actions.addWidget(self.clear_button)
         editor_actions.addWidget(self.save_button)
-        right_layout.addLayout(editor_actions)
+        right_layout.addWidget(editor_foot)
 
         splitter.addWidget(left)
         splitter.addWidget(right)
-        splitter.setSizes([360, 980])
+        splitter.setSizes([264, 1020])
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
 
         self.search_edit.textChanged.connect(self.model.set_search_text)
+        self.model.modelReset.connect(self._update_list_count)
         self.list_view.selectionModel().currentChanged.connect(
             self._on_view_selection_changed
         )
@@ -179,6 +295,19 @@ class FindingsPage(QWidget):
         self.down_button.clicked.connect(lambda: self._move_current(1))
         self.copy_button.clicked.connect(self._copy_current)
         self.delete_button.clicked.connect(self._delete_current)
+
+    def _filter_risk(self, risk: str) -> None:
+        for value, button in self.filter_buttons.items():
+            button.setChecked(value == risk)
+        self.model.set_risk_filter(risk)
+        self._select_current_in_view()
+
+    def _update_list_count(self) -> None:
+        total = len(self.state.findings)
+        visible = self.model.rowCount()
+        self.list_count.setText(
+            f"{visible} / {total} 条" if visible != total else f"{total} 条"
+        )
 
     def set_state(self, state: ProjectState) -> None:
         self.state = state

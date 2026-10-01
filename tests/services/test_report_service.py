@@ -1,4 +1,5 @@
 from docx import Document
+from docx.oxml.ns import qn
 from PIL import Image
 import pytest
 
@@ -75,3 +76,46 @@ def test_real_docx_preserves_fields_and_embeds_evidence(tmp_path):
     assert "生产环境客户端凭证硬编码" in text
     assert len(document.inline_shapes) == 1
     assert any("/image" in rel.reltype for rel in document.part.rels.values())
+
+
+def test_poc_exp_is_exported_as_shaded_monospaced_code_block(tmp_path):
+    code = "curl -X POST /test\nif authorized:\n    run_exp()"
+    output = tmp_path / "report.docx"
+
+    ReportService().generate(
+        "示例项目",
+        [{"name": "命令执行", "poc_exp": code}],
+        output,
+    )
+
+    document = Document(output)
+    code_cells = [
+        table.cell(0, 0) for table in document.tables if table.cell(0, 0).text == code
+    ]
+
+    assert code_cells
+    cell = code_cells[0]
+    shading = cell._tc.tcPr.find(qn("w:shd"))
+    assert shading is not None
+    assert shading.get(qn("w:fill")) == "F3F4F6"
+    assert all(
+        run.font.name == "Consolas"
+        for paragraph in cell.paragraphs
+        for run in paragraph.runs
+    )
+
+
+@pytest.mark.parametrize("poc_exp", ["", None])
+def test_empty_poc_exp_is_omitted_from_report(tmp_path, poc_exp):
+    output = tmp_path / "report.docx"
+
+    ReportService().generate(
+        "示例项目",
+        [{"name": "命令执行", "poc_exp": poc_exp}],
+        output,
+    )
+
+    document = Document(output)
+
+    assert all(paragraph.text != "POC / EXP" for paragraph in document.paragraphs)
+    assert not document.tables

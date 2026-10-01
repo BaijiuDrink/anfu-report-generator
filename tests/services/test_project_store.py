@@ -76,3 +76,18 @@ def test_save_preserves_missing_screenshot_marker(tmp_path):
 
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["findings"][0]["verify_steps"] == marker
+
+
+def test_poc_exp_code_survives_project_save_and_load(tmp_path):
+    output = tmp_path / "customer.json"
+    code = "curl -X POST /test\nif authorized:\n    run_exp()"
+
+    ProjectStore().save(
+        output,
+        "customer",
+        [{"name": "命令执行", "poc_exp": code}],
+    )
+
+    loaded = ProjectStore().load(output)
+
+    assert loaded.findings[0]["poc_exp"] == code

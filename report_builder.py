@@ -4,6 +4,7 @@ import datetime
 from docx import Document
 from docx.shared import Inches, Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
 from docx.oxml.ns import nsdecls, qn
 from docx.oxml import OxmlElement, parse_xml
 from PIL import Image
@@ -164,6 +165,61 @@ def _add_body_text(doc, text, indent=1.0, size=10.5):
         p.paragraph_format.space_after = Pt(1)
         p.paragraph_format.first_line_indent = Cm(indent)
         _add_run(p, line, bold=False, size=size)
+
+
+def _add_code_block(doc, code):
+    table = doc.add_table(rows=1, cols=1)
+    table.alignment = WD_TABLE_ALIGNMENT.LEFT
+    table.autofit = False
+    width = (
+        doc.sections[-1].page_width
+        - doc.sections[-1].left_margin
+        - doc.sections[-1].right_margin
+    )
+    table.columns[0].width = width
+
+    cell = table.cell(0, 0)
+    cell.width = width
+    cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+    properties = cell._tc.get_or_add_tcPr()
+
+    shading = OxmlElement("w:shd")
+    shading.set(qn("w:fill"), "F3F4F6")
+    properties.append(shading)
+
+    margins = OxmlElement("w:tcMar")
+    for edge, value in (("top", 100), ("start", 140), ("bottom", 100), ("end", 140)):
+        margin = OxmlElement(f"w:{edge}")
+        margin.set(qn("w:w"), str(value))
+        margin.set(qn("w:type"), "dxa")
+        margins.append(margin)
+    properties.append(margins)
+
+    borders = OxmlElement("w:tcBorders")
+    for edge in ("top", "start", "bottom", "end"):
+        border = OxmlElement(f"w:{edge}")
+        border.set(qn("w:val"), "single")
+        border.set(qn("w:sz"), "4")
+        border.set(qn("w:color"), "D1D5DB")
+        borders.append(border)
+    properties.append(borders)
+
+    paragraph = cell.paragraphs[0]
+    paragraph.paragraph_format.space_before = Pt(0)
+    paragraph.paragraph_format.space_after = Pt(0)
+    paragraph.paragraph_format.first_line_indent = Cm(0)
+    paragraph.paragraph_format.left_indent = Cm(0)
+    lines = code.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    for index, line in enumerate(lines):
+        run = paragraph.add_run(_sanitize(line))
+        run.font.name = "Consolas"
+        run.font.size = Pt(9.5)
+        fonts = run._element.get_or_add_rPr().rFonts
+        fonts.set(qn("w:ascii"), "Consolas")
+        fonts.set(qn("w:hAnsi"), "Consolas")
+        fonts.set(qn("w:eastAsia"), FONT_NAME)
+        if index < len(lines) - 1:
+            run.add_break()
 
 
 def _add_image_to_doc(doc, image_path, max_width_inches=5.5):
@@ -350,6 +406,7 @@ class ReportBuilder:
         description = finding.get("description", "")
 
         verify_steps = finding.get("verify_steps", "")
+        poc_exp = finding.get("poc_exp") or ""
         verify_result = finding.get("verify_result", "")
 
         fix_suggestion = finding.get("fix_suggestion", "")
@@ -375,6 +432,10 @@ class ReportBuilder:
 
         _add_section_heading(self.document, "漏洞验证", level=3)
         self._add_verification_section(verify_steps, verify_result)
+
+        if poc_exp.strip():
+            _add_section_heading(self.document, "POC / EXP", level=3)
+            _add_code_block(self.document, poc_exp)
 
         _add_section_heading(self.document, "修复建议", level=3)
 

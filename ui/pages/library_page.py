@@ -29,12 +29,15 @@ class LibraryPage(QWidget):
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
+        root.setContentsMargins(20, 18, 20, 20)
+        root.setSpacing(14)
         header = QHBoxLayout()
         title = QLabel("漏洞库")
         title.setObjectName("pageTitle")
         header.addWidget(title)
         header.addStretch(1)
         self.add_button = QPushButton("新建模板")
+        self.add_button.setObjectName("primaryButton")
         self.edit_button = QPushButton("编辑")
         self.delete_button = QPushButton("删除")
         header.addWidget(self.add_button)
@@ -52,7 +55,9 @@ class LibraryPage(QWidget):
 
         splitter = QSplitter(Qt.Horizontal)
         self.list_widget = QListWidget()
+        self.list_widget.setObjectName("libraryList")
         self.preview = QTextBrowser()
+        self.preview.setObjectName("libraryPreview")
         splitter.addWidget(self.list_widget)
         splitter.addWidget(self.preview)
         splitter.setSizes([380, 760])

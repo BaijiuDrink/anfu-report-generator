@@ -21,10 +21,12 @@ from PySide6.QtWidgets import (
 )
 
 from app_state import ProjectState
+from services.project_history import ProjectHistory
 from services.project_store import ProjectStore
 from services.report_service import ReportService, ReportValidationError
 from ui.pages.findings_page import FindingsPage
 from ui.pages.library_page import LibraryPage
+from ui.pages.projects_page import ProjectsPage
 from ui.theme import LIGHT_WORKSTATION_QSS
 from vuln_manager import VulnManager
 
@@ -44,6 +46,7 @@ class MainWindow(QMainWindow):
         report_service: ReportService | None = None,
         vuln_manager: VulnManager | None = None,
         screenshots_dir: Path | None = None,
+        project_history: ProjectHistory | None = None,
         parent=None,
     ):
         super().__init__(parent)
@@ -52,6 +55,7 @@ class MainWindow(QMainWindow):
         self.report_service = report_service or ReportService()
         self.vuln_manager = vuln_manager or VulnManager()
         self.screenshots_dir = Path(screenshots_dir or default_screenshot_directory())
+        self.project_history = project_history or ProjectHistory()
         self._syncing_project_name = False
         self.setWindowTitle("安服报告工作台")
         self.resize(1440, 900)
@@ -71,7 +75,8 @@ class MainWindow(QMainWindow):
         top_bar = QFrame()
         top_bar.setObjectName("topBar")
         top_layout = QHBoxLayout(top_bar)
-        top_layout.setContentsMargins(20, 14, 20, 14)
+        top_layout.setContentsMargins(20, 10, 20, 10)
+        top_layout.setSpacing(8)
         brand_layout = QVBoxLayout()
         brand_layout.setSpacing(1)
         brand = QLabel("安服报告工作台")
@@ -81,13 +86,16 @@ class MainWindow(QMainWindow):
         brand_layout.addWidget(brand)
         brand_layout.addWidget(subtitle)
         top_layout.addLayout(brand_layout)
-        top_layout.addSpacing(28)
+        top_layout.addSpacing(20)
         project_label = QLabel("当前项目")
         top_layout.addWidget(project_label)
         self.project_name_edit = QLineEdit()
         self.project_name_edit.setPlaceholderText("请输入项目名称")
         self.project_name_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         top_layout.addWidget(self.project_name_edit, 1)
+        self.save_state_label = QLabel()
+        self.save_state_label.setObjectName("saveState")
+        top_layout.addWidget(self.save_state_label)
         self.new_button = QPushButton("新建")
         self.open_button = QPushButton("打开")
         self.save_button = QPushButton("保存")
@@ -108,27 +116,35 @@ class MainWindow(QMainWindow):
         body_layout.setSpacing(0)
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(210)
+        sidebar.setFixedWidth(156)
         sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setContentsMargins(14, 20, 14, 20)
+        sidebar_layout.setContentsMargins(8, 16, 8, 12)
+        sidebar_layout.setSpacing(4)
         section = QLabel("工作区")
+        section.setObjectName("navLabel")
         sidebar_layout.addWidget(section)
         self.findings_nav = QPushButton("漏洞管理")
         self.findings_nav.setCheckable(True)
         self.library_nav = QPushButton("漏洞库")
         self.library_nav.setCheckable(True)
+        self.projects_nav = QPushButton("项目管理")
+        self.projects_nav.setCheckable(True)
         sidebar_layout.addWidget(self.findings_nav)
         sidebar_layout.addWidget(self.library_nav)
+        sidebar_layout.addWidget(self.projects_nav)
         sidebar_layout.addStretch(1)
-        version = QLabel("PySide6 Desktop")
+        version = QLabel("本地项目 · 离线使用")
+        version.setObjectName("sideFoot")
         sidebar_layout.addWidget(version)
         body_layout.addWidget(sidebar)
 
         self.page_stack = QStackedWidget()
         self.findings_page = FindingsPage(self.screenshots_dir, self.vuln_manager)
         self.library_page = LibraryPage(self.vuln_manager)
+        self.projects_page = ProjectsPage()
         self.page_stack.addWidget(self.findings_page)
         self.page_stack.addWidget(self.library_page)
+        self.page_stack.addWidget(self.projects_page)
         body_layout.addWidget(self.page_stack, 1)
         root.addWidget(body, 1)
 
@@ -139,7 +155,12 @@ class MainWindow(QMainWindow):
         self.generate_button.clicked.connect(self.generate_report)
         self.findings_nav.clicked.connect(self.show_findings_page)
         self.library_nav.clicked.connect(self.show_library_page)
+        self.projects_nav.clicked.connect(self.show_projects_page)
+        self.projects_page.openRequested.connect(self.open_recent_project)
+        self.projects_page.relocateRequested.connect(self.relocate_recent_project)
+        self.projects_page.removeRequested.connect(self.remove_recent_project)
         self.findings_page.stateChanged.connect(self._on_state_changed)
+        self.findings_page.editor.dirtyChanged.connect(self._on_state_changed)
         self.show_findings_page()
         self.statusBar().showMessage("就绪")
 
@@ -150,6 +171,7 @@ class MainWindow(QMainWindow):
         finally:
             self._syncing_project_name = False
         self.findings_page.set_state(self.state)
+        self._on_state_changed()
 
     def _project_name_changed(self, text: str) -> None:
         if self._syncing_project_name:
@@ -159,23 +181,47 @@ class MainWindow(QMainWindow):
         self._on_state_changed()
 
     def _on_state_changed(self) -> None:
-        suffix = (
-            " *" if self.state.dirty or self.findings_page.editor.is_dirty() else ""
-        )
+        dirty = self.state.dirty or self.findings_page.editor.is_dirty()
+        suffix = " *" if dirty else ""
         self.setWindowTitle(f"安服报告工作台{suffix}")
+        self.save_state_label.setText("● 未保存更改" if dirty else "● 已保存")
+        self.save_state_label.setProperty("dirty", dirty)
+        self.save_state_label.style().unpolish(self.save_state_label)
+        self.save_state_label.style().polish(self.save_state_label)
 
     def show_findings_page(self) -> bool:
         self.page_stack.setCurrentWidget(self.findings_page)
-        self.findings_nav.setChecked(True)
-        self.library_nav.setChecked(False)
+        self._sync_navigation()
         return True
 
     def show_library_page(self) -> bool:
+        if not self._allow_page_change():
+            self._sync_navigation()
+            return False
+        self.library_page.refresh()
+        self.page_stack.setCurrentWidget(self.library_page)
+        self._sync_navigation()
+        return True
+
+    def show_projects_page(self) -> bool:
+        if not self._allow_page_change():
+            self._sync_navigation()
+            return False
+        self._refresh_projects_page()
+        self.page_stack.setCurrentWidget(self.projects_page)
+        self._sync_navigation()
+        return True
+
+    def _sync_navigation(self) -> None:
+        current = self.page_stack.currentWidget()
+        self.findings_nav.setChecked(current is self.findings_page)
+        self.library_nav.setChecked(current is self.library_page)
+        self.projects_nav.setChecked(current is self.projects_page)
+
+    def _allow_page_change(self) -> bool:
         if self.findings_page.editor.is_dirty():
             decision = self.findings_page.confirm_unsaved()
             if decision == "cancel":
-                self.findings_nav.setChecked(True)
-                self.library_nav.setChecked(False)
                 return False
             if decision == "save" and not self.findings_page.save_current():
                 return False
@@ -185,11 +231,78 @@ class MainWindow(QMainWindow):
                     self.findings_page.editor.clear_form()
                 else:
                     self.findings_page.editor.set_finding(self.state.findings[index])
-        self.library_page.refresh()
-        self.page_stack.setCurrentWidget(self.library_page)
-        self.findings_nav.setChecked(False)
-        self.library_nav.setChecked(True)
         return True
+
+    def _refresh_projects_page(self) -> None:
+        try:
+            projects = self.project_history.refresh()
+        except Exception:
+            LOGGER.exception("Failed to refresh recent projects")
+            projects = self.project_history.entries()
+            self.statusBar().showMessage("历史项目扫描失败，显示上次记录", 7000)
+        self.projects_page.set_projects(projects)
+
+    def open_recent_project(self, record_id: str) -> bool:
+        self._refresh_projects_page()
+        project = self.project_history.get(record_id)
+        if project is None:
+            return False
+        if project.missing:
+            self.statusBar().showMessage("JSON 文件已移动，请重新定位", 7000)
+            return False
+        return self.open_project(project.path)
+
+    def relocate_recent_project(self, record_id: str, path: Path | None = None) -> bool:
+        project = self.project_history.get(record_id)
+        if project is None:
+            return False
+        if path is None:
+            selected, _ = QFileDialog.getOpenFileName(
+                self,
+                "重新定位项目 JSON",
+                str(project.original_dir),
+                "项目文件 (*.json);;所有文件 (*)",
+            )
+            if not selected:
+                return False
+            path = Path(selected)
+        try:
+            loaded = self.project_store.load(Path(path))
+        except Exception:
+            LOGGER.exception("Failed to relink project: %s", path)
+            QMessageBox.critical(
+                self, "无法重新定位", "所选 JSON 不是可读取的项目文件。"
+            )
+            return False
+        if loaded.project_name != project.name:
+            answer = QMessageBox.question(
+                self,
+                "项目名称不同",
+                "所选 JSON 的项目名称与历史记录不同，仍要重新关联吗？",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if answer != QMessageBox.Yes:
+                return False
+        try:
+            self.project_history.relink(record_id, loaded.path, loaded.project_name)
+        except Exception:
+            LOGGER.exception("Failed to update recent project path: %s", path)
+            self.statusBar().showMessage("历史记录更新失败，请稍后重试", 7000)
+            return False
+        self._refresh_projects_page()
+        self.statusBar().showMessage(f"已重新定位项目：{loaded.path}", 5000)
+        return True
+
+    def remove_recent_project(self, record_id: str) -> None:
+        try:
+            self.project_history.forget(record_id)
+        except Exception:
+            LOGGER.exception("Failed to remove recent project: %s", record_id)
+            self.statusBar().showMessage("历史记录更新失败，请稍后重试", 7000)
+            return
+        self._refresh_projects_page()
+        self.statusBar().showMessage("已移除历史记录，项目文件未删除", 5000)
 
     def confirm_project_change(self) -> str:
         if not self.state.dirty and not self.findings_page.editor.is_dirty():
@@ -246,6 +359,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             f"已打开项目，共 {len(self.state.findings)} 条漏洞", 5000
         )
+        self._remember_project(loaded.path, loaded.project_name)
         return True
 
     def save_project(self, path: Path | None = None) -> bool:
@@ -280,7 +394,17 @@ class MainWindow(QMainWindow):
         self.findings_page.editor.mark_clean()
         self._on_state_changed()
         self.statusBar().showMessage(f"项目已保存：{path}", 5000)
+        self._remember_project(self.state.project_path, project_name)
         return True
+
+    def _remember_project(self, path: Path, name: str) -> None:
+        try:
+            self.project_history.record(path, name)
+            if self.page_stack.currentWidget() is self.projects_page:
+                self._refresh_projects_page()
+        except Exception:
+            LOGGER.exception("Failed to update recent project history: %s", path)
+            self.statusBar().showMessage("历史记录更新失败，项目文件已正常处理", 7000)
 
     def generate_report(self, path: Path | None = None) -> bool:
         if not self.findings_page.commit_active():
