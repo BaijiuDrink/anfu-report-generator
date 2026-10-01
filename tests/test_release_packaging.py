@@ -33,13 +33,23 @@ def test_release_workflow_builds_windows_and_linux_downloads():
     jobs = workflow["jobs"]
     assert jobs["windows"]["runs-on"] == "windows-latest"
     assert jobs["linux"]["runs-on"] == "ubuntu-22.04"
-    assert jobs["publish"]["needs"] == ["windows", "linux"]
-    publish_steps = str(jobs["publish"]["steps"])
+    assert jobs["publish_windows"]["needs"] == "windows"
+    assert jobs["publish_linux"]["needs"] == ["linux", "publish_windows"]
+    publish_steps = str(jobs["publish_windows"]["steps"])
     assert "GH_REPO" in publish_steps
     assert "github.repository" in publish_steps
 
     windows_steps = str(jobs["windows"]["steps"])
     linux_steps = str(jobs["linux"]["steps"])
+    windows_upload = next(
+        step
+        for step in jobs["windows"]["steps"]
+        if step.get("uses") == "actions/upload-artifact@v4"
+    )
+    assert (
+        windows_upload["with"]["path"]
+        == "dist/anfu-report-generator-windows-x86_64.exe"
+    )
     assert "安服报告生成工具.exe" in windows_steps
     assert "python -m PyInstaller" in windows_steps
     assert "Smoke test Windows executable" in windows_steps

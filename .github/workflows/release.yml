@@ -120,19 +120,34 @@ jobs:
             dist/anfu-report-generator-linux-x86_64.tar.gz
           if-no-files-found: error
 
-  publish:
+  publish_windows:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [windows, linux]
+    needs: windows
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
+          name: windows-x86_64
           path: release-assets
-          merge-multiple: true
-      - name: Create or update GitHub Release
+      - name: Publish Windows executable
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --generate-notes
           gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
+
+  publish_linux:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, publish_windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-x86_64
+          path: release-assets
+      - name: Add Linux packages to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
