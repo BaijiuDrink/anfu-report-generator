@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>安服报告工作台 — UI 重设计原型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============ 设计令牌 ============ */
+:root {
+  /* 中性色：暖纸灰 + 冷墨文字（oklch 感知均匀） */
+  --bg-page:       oklch(96.8% 0.008 90);
+  --bg-surface:    oklch(99.2% 0.004 90);
+  --bg-sunken:     oklch(94.8% 0.008 90);
+  --ink-1:         oklch(27% 0.02 255);   /* 主文字 */
+  --ink-2:         oklch(46% 0.015 255);  /* 次文字 */
+  --ink-3:         oklch(60% 0.012 255);  /* 辅助文字 */
+  --line:          oklch(89% 0.008 90);   /* 发丝边框 */
+  --line-strong:   oklch(80% 0.01 90);
+
+  /* 品牌主色：墨蓝（收敛使用，每屏最多两处） */
+  --brand:         oklch(46% 0.085 255);
+  --brand-deep:    oklch(38% 0.08 255);
+  --brand-wash:    oklch(94% 0.02 255);
+
+  /* 风险等级五色阶：bg / text / bar 三件套，色彩+文字双编码 */
+  --sev-critical-bg: oklch(93.5% 0.03 27);  --sev-critical-tx: oklch(42% 0.16 27);  --sev-critical-bar: oklch(54% 0.20 27);
+  --sev-high-bg:     oklch(94% 0.035 58);   --sev-high-tx:     oklch(44% 0.14 55);  --sev-high-bar:     oklch(58% 0.17 55);
+  --sev-medium-bg:   oklch(95% 0.04 92);    --sev-medium-tx:   oklch(43% 0.10 85);  --sev-medium-bar:   oklch(62% 0.13 85);
+  --sev-low-bg:      oklch(94% 0.02 240);   --sev-low-tx:      oklch(42% 0.09 240); --sev-low-bar:      oklch(58% 0.11 240);
+  --sev-info-bg:     oklch(94.5% 0.008 250);--sev-info-tx:     oklch(43% 0.015 250);--sev-info-bar:     oklch(62% 0.012 250);
+
+  /* 语义色 */
+  --ok:            oklch(48% 0.11 160);
+  --warn:          oklch(62% 0.14 75);
+  --danger:        oklch(48% 0.17 27);
+
+  /* 字体 */
+  --font-display: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
+  --font-body: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+
+  /* 字号：5 级模块化比例（1.25 major third） */
+  --fs-xs: 11px; --fs-sm: 12px; --fs-base: 13px; --fs-lg: 16px; --fs-xl: 20px;
+
+  /* 间距：8px 基节奏 */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+
+  --radius: 8px;
+  --radius-lg: 10px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1); /* ease-out-quart */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font-body);
+  font-size: var(--fs-base);
+  color: var(--ink-1);
+  background: var(--bg-page);
+  line-height: 1.6;
+  font-kerning: normal;
+  overflow: hidden;
+}
+::selection { background: var(--brand-wash); }
+
+.app { display: flex; flex-direction: column; height: 100vh; min-width: 960px; }
+
+/* ============ 顶部工具栏 ============ */
+.topbar {
+  display: flex; align-items: center; gap: var(--s5);
+  padding: var(--s3) var(--s5);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--line);
+}
+.brand h1 {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg); font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.brand p { font-size: var(--fs-xs); color: var(--ink-3); letter-spacing: 0.06em; }
+.project { display: flex; align-items: center; gap: var(--s3); flex: 1; max-width: 620px; margin-left: var(--s5); }
+.project label { font-size: var(--fs-sm); color: var(--ink-2); white-space: nowrap; }
+.save-state {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-xs); color: var(--ink-2);
+  background: var(--bg-sunken); border: 1px solid var(--line);
+  padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+}
+.save-state .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+.save-state.clean .dot { background: var(--ok); }
+.actions { display: flex; gap: var(--s2); margin-left: auto; }
+
+/* ============ 按钮 ============ */
+.btn {
+  font-family: var(--font-body); font-size: var(--fs-sm);
+  padding: 6px 14px; border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--bg-surface); color: var(--ink-1);
+  cursor: pointer; transition: all 150ms var(--ease);
+}
+.btn:hover:not(:disabled) { border-color: var(--ink-3); background: var(--bg-sunken); }
+.btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: oklch(98% 0.01 255); }
+.btn.primary:hover:not(:disabled) { background: var(--brand-deep); border-color: var(--brand-deep); }
+.btn.danger { color: var(--danger); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
+.btn.ghost:hover:not(:disabled) { background: var(--bg-sunken); }
+.btn.icon { padding: 6px 9px; font-size: var(--fs-base); line-height: 1; }
+
+/* ============ 主体三栏 ============ */
+.body { display: flex; flex: 1; min-height: 0; }
+
+/* 侧栏 */
+.sidebar {
+  width: var(--sidebar-w, 156px); flex-shrink: 0;
+  position: relative;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--line);
+  padding: var(--s4) var(--s2);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.nav-label { font-size: var(--fs-xs); color: var(--ink-3); padding: 0 var(--s2) var(--s2); letter-spacing: 0.08em; }
+.nav-item {
+  display: flex; align-items: center; gap: var(--s2);
+  font-size: var(--fs-base); color: var(--ink-2);
+  padding: 8px 10px; border-radius: var(--radius);
+  cursor: pointer; text-decoration: none;
+  transition: background 150ms var(--ease);
+}
+.nav-item:hover { background: var(--bg-sunken); color: var(--ink-1); }
+.nav-item.active { background: var(--brand-wash); color: var(--brand-deep); font-weight: 500; }
+.sidebar .spacer { flex: 1; }
+.side-foot { font-size: var(--fs-xs); color: var(--ink-3); padding: var(--s2); border-top: 1px solid var(--line); }
+
+/* 漏洞列表面板 */
+.list-panel {
+  width: var(--list-w, 264px); flex-shrink: 0;
+  position: relative;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; min-height: 0;
+}
+.list-head { display: flex; align-items: baseline; justify-content: space-between; padding: var(--s4) var(--s4) var(--s2); }
+.list-head h2 { font-family: var(--font-display); font-size: var(--fs-base); font-weight: 600; }
+.list-head .count { font-size: var(--fs-xs); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.list-search { padding: 0 var(--s4) var(--s2); }
+.chips { display: flex; gap: var(--s1); padding: 0 var(--s4) var(--s3); flex-wrap: wrap; }
+.chip {
+  font-size: var(--fs-xs); padding: 2px 9px; border-radius: 999px;
+  background: var(--bg-sunken); color: var(--ink-2);
+  border: 1px solid transparent; cursor: pointer;
+  transition: all 150ms var(--ease);
+}
+.chip:hover { border-color: var(--line-strong); }
+.chip.on { background: var(--ink-1); color: var(--bg-surface); }
+.chip .n { font-variant-numeric: tabular-nums; opacity: 0.75; }
+
+.vuln-list { flex: 1; overflow-y: auto; padding: 0 var(--s2); display: flex; flex-direction: column; gap: var(--s1); }
+.vuln-item {
+  border: 1px solid transparent; border-left: 3px solid var(--sev-bar, var(--line-strong));
+  border-radius: var(--radius);
+  padding: 8px 10px; cursor: pointer;
+  transition: all 150ms var(--ease);
+}
+.vuln-item:hover { background: var(--bg-sunken); }
+.vuln-item.sel { background: var(--bg-surface); border-color: var(--line-strong); border-left-color: var(--sev-bar); }
+.vuln-item .row1 { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+.vuln-item .name { font-size: var(--fs-base); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vuln-item .row2 { font-size: var(--fs-xs); color: var(--ink-3); font-family: var(--font-mono); margin-top: 2px; }
+.sev-badge {
+  font-size: var(--fs-xs); padding: 1px 8px; border-radius: 999px;
+  background: var(--sev-bg); color: var(--sev-tx); white-space: nowrap; flex-shrink: 0;
+}
+.list-empty { padding: var(--s6) var(--s4); text-align: center; color: var(--ink-3); font-size: var(--fs-sm); }
+.list-empty strong { display: block; color: var(--ink-2); margin-bottom: var(--s1); }
+
+.list-foot {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s1);
+  padding: var(--s2) var(--s3);
+  border-top: 1px solid var(--line);
+}
+.list-foot .grow { display: none; }
+.list-foot > .btn:not(.icon) { grid-column: span 2; white-space: nowrap; padding-inline: 7px; }
+.list-foot > .btn.icon { width: 100%; }
+
+/* ============ 编辑区 ============ */
+.editor { flex: 1; display: flex; flex-direction: column; min-width: 480px; min-height: 0; }
+.editor-head {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--line);
+  padding: var(--s3) var(--s5);
+  display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap;
+}
+.editor-head .v-name { font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 600; }
+.editor-head .v-meta { font-size: var(--fs-xs); color: var(--ink-3); font-family: var(--font-mono); }
+.editor-head .spacer { flex: 1; }
+
+/* 分段控件 */
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius); overflow: hidden; background: var(--bg-surface); }
+.seg .opt {
+  font-size: var(--fs-sm); padding: 5px 13px; cursor: pointer; color: var(--ink-2);
+  border-right: 1px solid var(--line); user-select: none;
+  transition: all 120ms var(--ease);
+}
+.seg .opt:last-child { border-right: none; }
+.seg .opt:hover { background: var(--bg-sunken); }
+.seg .opt.on { background: var(--sev-bg, var(--brand-wash)); color: var(--sev-tx, var(--brand-deep)); font-weight: 500; }
+
+.editor-scroll { flex: 1; overflow-y: auto; padding: var(--s4) var(--s5) var(--s6); display: flex; flex-direction: column; gap: var(--s4); }
+
+/* 分区卡片 */
+.section { background: var(--bg-surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+.section-head {
+  display: flex; align-items: baseline; gap: var(--s3);
+  padding: var(--s3) var(--s4); cursor: pointer; user-select: none;
+}
+.section-head h3 { font-family: var(--font-display); font-size: var(--fs-base); font-weight: 600; }
+.section-head .fields { font-size: var(--fs-xs); color: var(--ink-3); }
+.section-head .toggle { margin-left: auto; font-size: var(--fs-xs); color: var(--brand); }
+.section-body { padding: 0 var(--s4) var(--s4); display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3) var(--s4); }
+.section.collapsed .section-body { display: none; }
+.field { display: flex; flex-direction: column; gap: var(--s1); }
+.field.span2 { grid-column: span 2; }
+.field label { font-size: var(--fs-sm); color: var(--ink-2); }
+.field label .req { color: var(--danger); margin-left: 2px; }
+.field .hint { font-size: var(--fs-xs); color: var(--ink-3); }
+
+input[type="text"], textarea {
+  font-family: var(--font-body); font-size: var(--fs-base); color: var(--ink-1);
+  background: var(--bg-surface);
+  border: 1px solid var(--line-strong); border-radius: var(--radius);
+  padding: 7px 10px; width: 100%;
+  transition: border-color 150ms var(--ease), box-shadow 150ms var(--ease);
+}
+textarea { resize: vertical; min-height: 72px; line-height: 1.6; }
+input::placeholder, textarea::placeholder { color: var(--ink-3); }
+input:focus-visible, textarea:focus-visible {
+  outline: none; border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-focus, oklch(46% 0.085 255 / 0.14));
+}
+
+/* ============ 设计调节台 ============ */
+#panelFab {
+  position: fixed; right: 20px; bottom: 46px; z-index: 98;
+}
+#tokenPanel {
+  position: fixed; top: 0; right: -320px; bottom: 0; width: 300px; z-index: 97;
+  background: var(--bg-surface); border-left: 1px solid var(--line);
+  padding: var(--s4); overflow-y: auto;
+  transition: right 250ms var(--ease);
+  display: flex; flex-direction: column; gap: var(--s3);
+}
+#tokenPanel.open { right: 0; }
+.tp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s1); }
+.tp-head h3 { font-family: var(--font-display); font-size: var(--fs-base); font-weight: 600; }
+.tp-row { display: grid; grid-template-columns: 72px 1fr 40px; align-items: center; gap: var(--s2); }
+.tp-row label { font-size: var(--fs-sm); color: var(--ink-2); }
+.tp-row .tp-val { font-size: var(--fs-xs); color: var(--ink-3); font-variant-numeric: tabular-nums; text-align: right; }
+input[type="range"] { width: 100%; accent-color: var(--brand); }
+.tp-seg { display: flex; border: 1px solid var(--line-strong); border-radius: var(--radius); overflow: hidden; }
+.tp-seg span { flex: 1; text-align: center; font-size: var(--fs-sm); padding: 5px 0; cursor: pointer; color: var(--ink-2); }
+.tp-seg span.on { background: var(--brand-wash); color: var(--brand-deep); font-weight: 500; }
+#tpSwatches { display: flex; gap: 6px; }
+#tpSwatches i { flex: 1; height: 26px; border-radius: 6px; border: 1px solid var(--line); }
+.tp-actions { display: flex; gap: var(--s2); margin-top: auto; padding-top: var(--s3); border-top: 1px solid var(--line); }
+.tp-actions .btn { flex: 1; padding: 6px 8px; }
+.tp-note { font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.5; }
+.mono { font-family: var(--font-mono); font-size: var(--fs-sm); font-variant-ligatures: none; }
+
+/* 单选胶囊组 */
+.pills { display: flex; gap: var(--s2); }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-sm); padding: 5px 12px;
+  border: 1px solid var(--line-strong); border-radius: 999px;
+  cursor: pointer; color: var(--ink-2); user-select: none;
+  transition: all 120ms var(--ease);
+}
+.pill input { display: none; }
+.pill:hover { border-color: var(--ink-3); }
+.pill.on { border-color: var(--brand); background: var(--brand-wash); color: var(--brand-deep); font-weight: 500; }
+
+/* 底部吸底操作栏 */
+.editor-foot {
+  position: sticky; bottom: 0;
+  display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s3) var(--s5);
+  background: var(--bg-surface); border-top: 1px solid var(--line);
+}
+.editor-foot .saved-at { font-size: var(--fs-xs); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.editor-foot .spacer { flex: 1; }
+
+/* 状态栏 */
+.statusbar {
+  display: flex; align-items: center; gap: var(--s4);
+  padding: 4px var(--s5);
+  font-size: var(--fs-xs); color: var(--ink-3);
+  background: var(--bg-surface); border-top: 1px solid var(--line);
+}
+.statusbar .ok-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); display: inline-block; margin-right: 5px; }
+.statusbar .spacer { flex: 1; }
+
+/* ============ 布局编辑模式 ============ */
+body.layout .sidebar, body.layout .list-panel, body.layout .section {
+  outline: 1.5px dashed var(--brand); outline-offset: -2px;
+}
+.frame-tag {
+  position: absolute; top: -9px; left: 8px; z-index: 6;
+  font-size: 10px; line-height: 1; padding: 3px 7px;
+  background: var(--brand); color: oklch(98% 0.01 255);
+  border-radius: 4px; display: none; pointer-events: none;
+  white-space: nowrap;
+}
+body.layout .frame-tag { display: block; }
+.drag-handle {
+  position: absolute; top: 0; bottom: 0; right: -4px; width: 8px;
+  cursor: col-resize; z-index: 7; display: none;
+}
+body.layout .drag-handle { display: block; }
+.drag-handle:hover, .drag-handle.active { background: var(--brand-wash); }
+body.layout .section { position: relative; cursor: grab; }
+body.layout .section:active { cursor: grabbing; }
+.section.dragging { opacity: 0.45; }
+.section.drop-before { box-shadow: 0 -3px 0 0 var(--brand); }
+#layoutBar {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  z-index: 99; display: none; align-items: center; gap: var(--s3);
+  background: var(--ink-1); color: var(--bg-surface);
+  font-size: var(--fs-sm); padding: 8px 14px; border-radius: 999px;
+}
+body.layout #layoutBar { display: flex; }
+#layoutBar .lb-btn {
+  background: transparent; border: 1px solid oklch(60% 0.02 255);
+  color: var(--bg-surface); font-size: var(--fs-xs);
+  padding: 3px 10px; border-radius: 999px; cursor: pointer;
+}
+#layoutBar .lb-btn:hover { border-color: var(--bg-surface); }
+#layoutBar .lb-btn.done { background: var(--brand); border-color: var(--brand); }
+
+/* Toast */
+.toast {
+  position: fixed; top: 56px; right: 20px;
+  background: var(--ink-1); color: var(--bg-surface);
+  font-size: var(--fs-sm); padding: 8px 16px; border-radius: var(--radius);
+  opacity: 0; transform: translateY(-8px);
+  transition: all 250ms var(--ease); pointer-events: none; z-index: 99;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
+
+@media (max-width: 1180px) {
+  .sidebar { width: 52px; }
+  .sidebar .nav-label, .sidebar .side-foot, .sidebar .nav-item span { display: none; }
+}
+
+/* 可编辑画布。编辑器独立于原型页面，不参与导出的界面布局。 */
+#canvasFab { position: fixed; right: 20px; bottom: 138px; z-index: 98; }
+#canvasPanel {
+  position: fixed; top: 0; right: -350px; bottom: 0; width: 330px; z-index: 120;
+  display: flex; flex-direction: column; gap: 12px; padding: 18px;
+  background: var(--bg-surface); border-left: 1px solid var(--line);
+  box-shadow: -12px 0 36px oklch(27% 0.02 255 / 0.08);
+  overflow-y: auto; transition: right 250ms var(--ease);
+}
+#canvasPanel.open { right: 0; }
+.canvas-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.canvas-head strong { font-family: var(--font-display); font-size: var(--fs-lg); }
+.canvas-note, #canvasStatus { font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.5; }
+#canvasSelection {
+  padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--radius);
+  color: var(--ink-2); font-size: var(--fs-sm); overflow-wrap: anywhere;
+}
+.canvas-field { display: flex; flex-direction: column; gap: 4px; }
+.canvas-field label, .canvas-field summary { font-size: var(--fs-sm); color: var(--ink-2); }
+.canvas-field textarea { min-height: 60px; }
+.canvas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.canvas-grid input[type="number"] {
+  font-family: var(--font-body); font-size: var(--fs-base); color: var(--ink-1);
+  background: var(--bg-surface); border: 1px solid var(--line-strong);
+  border-radius: var(--radius); padding: 7px 10px; width: 100%;
+}
+.canvas-grid input[type="number"]:focus-visible { outline: 2px solid var(--brand); }
+.canvas-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.canvas-actions .btn { flex: 1 1 42%; }
+#canvasCss { font-family: var(--font-mono); font-size: var(--fs-sm); min-height: 90px; }
+#canvasPanel hr { border: none; border-top: 1px solid var(--line); }
+body.canvas-mode .app [data-canvas-id] { cursor: crosshair; }
+body.canvas-mode .app .canvas-selected {
+  outline: 2px solid var(--brand) !important; outline-offset: -2px;
+}
+body.canvas-mode .app [contenteditable="true"] { cursor: text; }
+@media (min-width: 1300px) {
+  body.canvas-mode .app { width: calc(100vw - 330px); min-width: 960px; }
+}
+@media (max-width: 1299px) {
+  body.canvas-mode .app { height: 55vh; }
+  #canvasPanel {
+    top: auto; right: 0; bottom: -45vh; width: 100%; height: 45vh;
+    border-left: none; border-top: 1px solid var(--line);
+    box-shadow: 0 -12px 36px oklch(27% 0.02 255 / 0.08);
+    transition: bottom 250ms var(--ease);
+  }
+  #canvasPanel.open { bottom: 0; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <h1>安服报告工作台</h1>
+      <p>漏洞整理 · 证据归档 · 规范报告生成</p>
+    </div>
+    <div class="project">
+      <label for="projectName">当前项目</label>
+      <input type="text" id="projectName" placeholder="请输入项目名称" style="max-width:280px">
+      <span class="save-state" id="saveState"><i class="dot"></i>未保存更改</span>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btnNewProj">新建</button>
+      <button class="btn">打开</button>
+      <button class="btn" id="btnSaveProj">保存</button>
+      <button class="btn primary">生成报告</button>
+    </div>
+  </header>
+
+  <div class="body">
+
+    <nav class="sidebar">
+      <span class="frame-tag">导航栏 · 拖右缘调宽</span>
+      <div class="drag-handle" id="handleSidebar"></div>
+      <div class="nav-label">工作区</div>
+      <a class="nav-item active"><span>漏洞管理</span></a>
+      <a class="nav-item"><span>漏洞库</span></a>
+      <div class="spacer"></div>
+      <div class="side-foot">v1.2 · 本地存储模式</div>
+    </nav>
+
+    <aside class="list-panel">
+      <span class="frame-tag">漏洞列表 · 拖右缘调宽</span>
+      <div class="drag-handle" id="handleList"></div>
+      <div class="list-head">
+        <h2>漏洞列表</h2>
+        <span class="count" id="vulnCount">共 0 项</span>
+      </div>
+      <div class="list-search">
+        <input type="text" id="searchInput" placeholder="搜索名称、地址或网络区域">
+      </div>
+      <div class="chips" id="chips"></div>
+      <div class="vuln-list" id="vulnList"></div>
+      <div class="list-foot">
+        <button class="btn primary" id="btnAdd">+ 新建漏洞</button>
+        <button class="btn ghost">从漏洞库添加</button>
+        <div class="grow"></div>
+        <button class="btn ghost icon" id="btnUp" title="上移" disabled>↑</button>
+        <button class="btn ghost icon" id="btnDown" title="下移" disabled>↓</button>
+        <button class="btn ghost icon" id="btnDup" title="复制" disabled>⧉</button>
+        <button class="btn ghost icon danger" id="btnDel" title="删除" disabled>✕</button>
+      </div>
+    </aside>
+
+    <main class="editor">
+      <div class="editor-head">
+        <span class="v-name" id="editTitle">未选择漏洞</span>
+        <span class="v-meta" id="editMeta"></span>
+        <div class="spacer"></div>
+        <label style="font-size:var(--fs-sm);color:var(--ink-2)">风险等级</label>
+        <div class="seg" id="sevSeg"></div>
+      </div>
+
+      <div class="editor-scroll">
+
+        <section class="section" data-open="1">
+          <span class="frame-tag">拖动改顺序</span>
+          <div class="section-head">
+            <h3>基本信息</h3>
+            <span class="fields">名称 / 地址 / 网络区域 / 修复优先级</span>
+            <span class="toggle">收起 ▾</span>
+          </div>
+          <div class="section-body">
+            <div class="field">
+              <label>漏洞名称<span class="req">*</span></label>
+              <input type="text" placeholder="请输入漏洞名称">
+            </div>
+            <div class="field">
+              <label>网络区域</label>
+              <div class="pills">
+                <label class="pill on"><input type="radio" name="region" checked>互联网</label>
+                <label class="pill"><input type="radio" name="region">内网</label>
+              </div>
+            </div>
+            <div class="field span2">
+              <label>漏洞地址</label>
+              <textarea class="mono" rows="3" placeholder="每行一个漏洞地址或受影响主机"></textarea>
+            </div>
+            <div class="field span2">
+              <label>修复优先级</label>
+              <div class="seg" id="prioSeg">
+                <span class="opt">紧急</span><span class="opt on">高</span><span class="opt">中</span><span class="opt">低</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" data-open="1">
+          <span class="frame-tag">拖动改顺序</span>
+          <div class="section-head">
+            <h3>漏洞内容</h3>
+            <span class="fields">漏洞描述</span>
+            <span class="toggle">收起 ▾</span>
+          </div>
+          <div class="section-body">
+            <div class="field span2">
+              <label>漏洞描述</label>
+              <textarea rows="4" placeholder="说明漏洞成因、触发条件和影响"></textarea>
+              <span class="hint">将原样写入报告「漏洞描述」章节</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" data-open="1">
+          <span class="frame-tag">拖动改顺序</span>
+          <div class="section-head">
+            <h3>验证证据</h3>
+            <span class="fields">漏洞验证 / POC · EXP / 验证结果</span>
+            <span class="toggle">收起 ▾</span>
+          </div>
+          <div class="section-body">
+            <div class="field span2">
+              <label>漏洞验证</label>
+              <textarea rows="3" placeholder="输入验证步骤，可直接从 Word/WPS 粘贴图文内容"></textarea>
+            </div>
+            <div class="field span2">
+              <label>POC / EXP <span style="color:var(--ink-3);font-weight:400">（选填）</span></label>
+              <textarea class="mono" rows="4" placeholder="粘贴或填写 POC / EXP 代码、命令"></textarea>
+            </div>
+            <div class="field span2">
+              <label>验证结果</label>
+              <textarea rows="2" placeholder="填写验证结论"></textarea>
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <span class="frame-tag">拖动改顺序</span>
+          <div class="section-head">
+            <h3>整改建议</h3>
+            <span class="fields">修复建议 / 整改验证方法</span>
+            <span class="toggle">展开 ▾</span>
+          </div>
+          <div class="section-body">
+            <div class="field span2">
+              <label>修复建议</label>
+              <textarea rows="3" placeholder="填写可落地的修复措施"></textarea>
+            </div>
+            <div class="field span2">
+              <label>整改验证方法</label>
+              <textarea rows="3" placeholder="填写整改后的验证方法"></textarea>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <div class="editor-foot">
+        <span class="saved-at" id="savedAt">尚未保存</span>
+        <div class="spacer"></div>
+        <button class="btn" id="btnClear">清空表单</button>
+        <button class="btn primary" id="btnSave">保存漏洞</button>
+      </div>
+    </main>
+
+  </div>
+
+  <footer class="statusbar">
+    <span><i class="ok-dot"></i>就绪</span>
+    <span id="statusMsg">已加载示例数据</span>
+    <div class="spacer"></div>
+    <span>本地项目文件 · 未上传</span>
+    <span>UTF-8</span>
+  </footer>
+</div>
+
+<button class="btn" id="layoutFab" style="position:fixed;right:20px;bottom:92px;z-index:98;">布局模式</button>
+<button class="btn primary" id="panelFab">调整设计</button>
+<button class="btn" id="canvasFab">自由编辑</button>
+<aside id="canvasPanel" aria-label="自由编辑画布">
+  <div class="canvas-head">
+    <strong>自由编辑画布</strong>
+    <button class="btn" id="canvasDone">完成</button>
+  </div>
+  <p class="canvas-note">点击页面元素选择，双击静态文字直接修改。分栏宽度与模块顺序可用“布局模式”调整。</p>
+  <div id="canvasSelection">选择页面上的一个元素</div>
+  <div class="canvas-field">
+    <label for="canvasText">文字或占位提示</label>
+    <textarea id="canvasText" rows="2" disabled></textarea>
+  </div>
+  <div class="canvas-grid">
+    <div class="canvas-field"><label for="canvasWidth">宽度 px</label><input type="number" id="canvasWidth" data-css-prop="width" min="0" placeholder="自动"></div>
+    <div class="canvas-field"><label for="canvasHeight">高度 px</label><input type="number" id="canvasHeight" data-css-prop="height" min="0" placeholder="自动"></div>
+    <div class="canvas-field"><label for="canvasPadding">内边距 px</label><input type="number" id="canvasPadding" data-css-prop="padding" min="0" placeholder="继承"></div>
+    <div class="canvas-field"><label for="canvasFontSize">字号 px</label><input type="number" id="canvasFontSize" data-css-prop="font-size" min="8" placeholder="继承"></div>
+    <div class="canvas-field"><label for="canvasMarginTop">上移/下移 px</label><input type="number" id="canvasMarginTop" data-css-prop="margin-top" placeholder="继承"></div>
+    <div class="canvas-field"><label for="canvasMarginLeft">左移/右移 px</label><input type="number" id="canvasMarginLeft" data-css-prop="margin-left" placeholder="继承"></div>
+  </div>
+  <div class="canvas-field"><label for="canvasBackground">背景色（如 #f4f6fa）</label><input type="text" id="canvasBackground" data-css-prop="background-color" placeholder="沿用主题"></div>
+  <div class="canvas-field"><label for="canvasColor">文字颜色（如 #23314a）</label><input type="text" id="canvasColor" data-css-prop="color" placeholder="沿用主题"></div>
+  <details class="canvas-field"><summary>当前元素的完整 CSS</summary><textarea id="canvasCss" spellcheck="false" placeholder="例：border-radius: 12px; gap: 8px;"></textarea><button class="btn" id="canvasApplyCss">应用 CSS</button></details>
+  <div class="canvas-actions"><button class="btn" id="canvasResetOne">还原选中元素</button></div>
+  <hr>
+  <div class="canvas-actions">
+    <button class="btn primary" id="canvasExportHtml">导出可编辑 HTML</button>
+    <button class="btn" id="canvasExportJson">导出设计 JSON</button>
+    <button class="btn" id="canvasImportBtn">导入设计 JSON</button>
+    <button class="btn danger" id="canvasResetAll">重置画布</button>
+  </div>
+  <input type="file" id="canvasImport" accept=".json,application/json" hidden>
+  <p id="canvasStatus" aria-live="polite">调整会自动保存在当前浏览器；导出 HTML 可把结果带到其他电脑。</p>
+</aside>
+<script type="application/json" id="canvasSeed">{}</script>
+<div id="layoutBar">
+  <span>拖边框改宽度 · 拖分区改顺序</span>
+  <button class="lb-btn" id="lbExport">导出布局</button>
+  <button class="lb-btn" id="lbReset">重置布局</button>
+  <button class="lb-btn done" id="lbDone">完成</button>
+</div>
+<aside id="tokenPanel">
+  <div class="tp-head"><h3>设计调节台</h3><button class="btn ghost icon" id="tpClose">✕</button></div>
+  <div class="tp-note">拖动滑杆实时预览整站配色与密度，满意后导出 QSS 应用到 PySide6。</div>
+  <div class="tp-row"><label>背景冷暖</label><input type="range" id="pNh" min="60" max="260" value="90" step="5"><span class="tp-val" id="vNh"></span></div>
+  <div class="tp-row"><label>主色色相</label><input type="range" id="pBh" min="200" max="300" value="255" step="1"><span class="tp-val" id="vBh"></span></div>
+  <div class="tp-row"><label>主色浓度</label><input type="range" id="pBc" min="3" max="14" value="8.5" step="0.5"><span class="tp-val" id="vBc"></span></div>
+  <div class="tp-row"><label>等级浓度</label><input type="range" id="pSc" min="70" max="130" value="100" step="5"><span class="tp-val" id="vSc"></span></div>
+  <div class="tp-row"><label>圆角</label><input type="range" id="pR" min="2" max="14" value="8" step="1"><span class="tp-val" id="vR"></span></div>
+  <div class="tp-row"><label>密度</label><input type="range" id="pD" min="85" max="120" value="100" step="5"><span class="tp-val" id="vD"></span></div>
+  <div class="tp-row"><label>标题字体</label>
+    <div class="tp-seg" style="grid-column: span 2">
+      <span id="fSerif" class="on">宋体（出版感）</span><span id="fSans">黑体（工具感）</span>
+    </div>
+  </div>
+  <div class="tp-row"><label>色板预览</label><div id="tpSwatches" style="grid-column: span 2"></div></div>
+  <div class="tp-actions">
+    <button class="btn" id="tpReset">重置</button>
+    <button class="btn" id="tpCopy">复制令牌</button>
+    <button class="btn primary" id="tpQss">导出 QSS</button>
+  </div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SEV = {
+  critical: { label: "严重", bg: "var(--sev-critical-bg)", tx: "var(--sev-critical-tx)", bar: "var(--sev-critical-bar)" },
+  high:     { label: "高危", bg: "var(--sev-high-bg)",     tx: "var(--sev-high-tx)",     bar: "var(--sev-high-bar)" },
+  medium:   { label: "中危", bg: "var(--sev-medium-bg)",   tx: "var(--sev-medium-tx)",   bar: "var(--sev-medium-bar)" },
+  low:      { label: "低危", bg: "var(--sev-low-bg)",      tx: "var(--sev-low-tx)",      bar: "var(--sev-low-bar)" },
+  info:     { label: "信息", bg: "var(--sev-info-bg)",     tx: "var(--sev-info-tx)",     bar: "var(--sev-info-bar)" }
+};
+
+let vulns = [
+  { id: 1, name: "登录接口 SQL 注入", sev: "critical", addr: "10.0.1.8",  region: "互联网" },
+  { id: 2, name: "后台弱口令登录",   sev: "high",     addr: "192.168.3.21", region: "内网" },
+  { id: 3, name: "Actuator 未授权访问", sev: "high",  addr: "10.0.2.15", region: "互联网" },
+  { id: 4, name: "静态目录遍历",     sev: "medium",   addr: "10.0.1.9",  region: "互联网" },
+  { id: 5, name: "TLS 证书即将过期", sev: "low",      addr: "10.0.1.10", region: "互联网" },
+  { id: 6, name: "Server 头信息泄露", sev: "info",    addr: "10.0.1.8",  region: "互联网" }
+];
+let selId = 1, filter = "all", keyword = "";
+let nextId = 7;
+
+const $ = s => document.querySelector(s);
+const listEl = $("#vulnList"), chipsEl = $("#chips"), segEl = $("#sevSeg");
+
+function visible() {
+  return vulns.filter(v =>
+    (filter === "all" || v.sev === filter) &&
+    (!keyword || (v.name + v.addr + v.region).includes(keyword))
+  );
+}
+
+function renderChips() {
+  const counts = { all: vulns.length };
+  for (const k in SEV) counts[k] = vulns.filter(v => v.sev === k).length;
+  let html = '<span class="chip' + (filter === "all" ? " on" : "") + '" data-f="all">全部 <span class="n">' + counts.all + "</span></span>";
+  for (const k in SEV) {
+    if (counts[k]) html += '<span class="chip' + (filter === k ? " on" : "") + '" data-f="' + k + '">' + SEV[k].label + ' <span class="n">' + counts[k] + "</span></span>";
+  }
+  chipsEl.innerHTML = html;
+}
+
+function renderList() {
+  const rows = visible();
+  $("#vulnCount").textContent = "共 " + rows.length + " 项";
+  if (!rows.length) {
+    listEl.innerHTML = '<div class="list-empty"><strong>没有匹配的漏洞</strong>调整筛选条件，或点击底部「+ 新建漏洞」录入第一条</div>';
+    return;
+  }
+  listEl.innerHTML = rows.map(v => {
+    const s = SEV[v.sev];
+    return '<div class="vuln-item' + (v.id === selId ? " sel" : "") + '" data-id="' + v.id + '" style="--sev-bar:' + s.bar + '">' +
+      '<div class="row1"><span class="name">' + v.name + '</span>' +
+      '<span class="sev-badge" style="--sev-bg:' + s.bg + ';--sev-tx:' + s.tx + '">' + s.label + "</span></div>" +
+      '<div class="row2">' + v.addr + " · " + v.region + "</div></div>";
+  }).join("");
+}
+
+function renderEditor() {
+  const v = vulns.find(x => x.id === selId);
+  $("#editTitle").textContent = v ? v.name : "未选择漏洞";
+  $("#editMeta").textContent = v ? v.addr + " · " + v.region : "";
+  segEl.innerHTML = Object.keys(SEV).map(k => {
+    const s = SEV[k], on = v && v.sev === k;
+    return '<span class="opt' + (on ? " on" : "") + '" data-sev="' + k + '"' +
+      (on ? ' style="--sev-bg:' + s.bg + ';--sev-tx:' + s.tx + '"' : "") + ">" + s.label + "</span>";
+  }).join("");
+  const has = !!v;
+  ["#btnUp", "#btnDown", "#btnDup", "#btnDel"].forEach(id => $(id).disabled = !has);
+}
+
+function renderAll() { renderChips(); renderList(); renderEditor(); }
+
+chipsEl.addEventListener("click", e => {
+  const c = e.target.closest(".chip"); if (!c) return;
+  filter = c.dataset.f; renderAll();
+});
+listEl.addEventListener("click", e => {
+  const it = e.target.closest(".vuln-item"); if (!it) return;
+  selId = +it.dataset.id; renderAll();
+});
+segEl.addEventListener("click", e => {
+  const o = e.target.closest(".opt"); if (!o) return;
+  const v = vulns.find(x => x.id === selId); if (!v) return;
+  v.sev = o.dataset.sev; markDirty(); renderAll();
+});
+$("#searchInput").addEventListener("input", e => { keyword = e.target.value.trim(); renderAll(); });
+
+$("#btnAdd").addEventListener("click", () => {
+  const v = { id: nextId++, name: "新建漏洞 " + (nextId - 1), sev: "medium", addr: "0.0.0.0", region: "互联网" };
+  vulns.unshift(v); selId = v.id; markDirty(); renderAll();
+  toast("已新建漏洞，请在右侧填写内容");
+});
+$("#btnDel").addEventListener("click", () => {
+  vulns = vulns.filter(v => v.id !== selId); selId = vulns[0] ? vulns[0].id : null;
+  markDirty(); renderAll(); toast("已删除所选漏洞");
+});
+$("#btnDup").addEventListener("click", () => {
+  const v = vulns.find(x => x.id === selId); if (!v) return;
+  const c = Object.assign({}, v, { id: nextId++, name: v.name + "（副本）" });
+  vulns.splice(vulns.indexOf(v) + 1, 0, c); selId = c.id; markDirty(); renderAll();
+});
+$("#btnUp").addEventListener("click", () => move(-1));
+$("#btnDown").addEventListener("click", () => move(1));
+function move(d) {
+  const i = vulns.findIndex(v => v.id === selId);
+  const j = i + d;
+  if (i < 0 || j < 0 || j >= vulns.length) return;
+  [vulns[i], vulns[j]] = [vulns[j], vulns[i]];
+  markDirty(); renderAll();
+}
+
+document.querySelectorAll(".section-head").forEach(h => {
+  h.addEventListener("click", () => {
+    const sec = h.parentElement;
+    sec.classList.toggle("collapsed");
+    h.querySelector(".toggle").textContent = sec.classList.contains("collapsed") ? "展开 ▾" : "收起 ▾";
+  });
+});
+document.querySelectorAll(".section").forEach(s => { if (!s.dataset.open) s.classList.add("collapsed"); });
+
+$("#prioSeg").addEventListener("click", e => {
+  const o = e.target.closest(".opt"); if (!o) return;
+  $("#prioSeg").querySelectorAll(".opt").forEach(x => x.classList.remove("on"));
+  o.classList.add("on"); markDirty();
+});
+document.querySelectorAll(".pill").forEach(p => {
+  p.addEventListener("click", () => {
+    p.parentElement.querySelectorAll(".pill").forEach(x => x.classList.remove("on"));
+    p.classList.add("on"); markDirty();
+  });
+});
+
+$("#btnSave").addEventListener("click", () => {
+  const t = new Date();
+  const hh = String(t.getHours()).padStart(2, "0"), mm = String(t.getMinutes()).padStart(2, "0");
+  $("#savedAt").textContent = "上次保存 " + hh + ":" + mm;
+  markClean(); toast("漏洞已保存");
+  $("#statusMsg").textContent = "保存完成 " + hh + ":" + mm;
+});
+$("#btnSaveProj").addEventListener("click", () => { markClean(); toast("项目已保存"); });
+$("#btnClear").addEventListener("click", () => {
+  document.querySelectorAll(".editor-scroll input[type=text], .editor-scroll textarea").forEach(el => el.value = "");
+  toast("表单已清空"); markDirty();
+});
+document.querySelectorAll(".editor-scroll input, .editor-scroll textarea, #projectName").forEach(el => {
+  el.addEventListener("input", markDirty);
+});
+
+function markDirty() {
+  const s = $("#saveState");
+  s.classList.remove("clean"); s.innerHTML = '<i class="dot"></i>未保存更改';
+}
+function markClean() {
+  const s = $("#saveState");
+  s.classList.add("clean"); s.innerHTML = '<i class="dot"></i>已保存';
+}
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._timer); t._timer = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+renderAll();
+</script>
+
+<script>
+/* ============ 设计调节台：令牌引擎 ============ */
+const THEME_DEFAULT = { nh: 90, bh: 255, bc: 0.085, sc: 1, r: 8, d: 1, serif: true };
+let T = Object.assign({}, THEME_DEFAULT);
+
+function oklchToHex(L, C, H) {
+  const h = H * Math.PI / 180;
+  const a = C * Math.cos(h), b = C * Math.sin(h), l = L / 100;
+  const l_ = l + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = l - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = l - 0.0894841775 * a - 1.2914855480 * b;
+  const l3 = l_ ** 3, m3 = m_ ** 3, s3 = s_ ** 3;
+  const ch = [
+     4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3,
+    -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3,
+    -0.0041960863 * l3 - 0.7034186147 * m3 + 1.7076147010 * s3
+  ].map(x => {
+    x = Math.max(0, Math.min(1, x));
+    const v = x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055;
+    return Math.round(v * 255).toString(16).padStart(2, "0");
+  });
+  return "#" + ch.join("");
+}
+
+function computeTokens() {
+  const nh = T.nh, bh = T.bh, bc = T.bc, sc = T.sc;
+  const sev = (hue, bl, bcx, gl, gcx, tl, tcx) => ({
+    bar: [bl, bcx * sc, hue], bg: [gl, gcx * sc, hue], tx: [tl, tcx * sc, hue]
+  });
+  return {
+    "bg-page": [96.8, 0.008, nh], "bg-surface": [99.2, 0.004, nh], "bg-sunken": [94.8, 0.008, nh],
+    "ink-1": [27, 0.02, bh], "ink-2": [46, 0.015, bh], "ink-3": [60, 0.012, bh],
+    "line": [89, 0.008, nh], "line-strong": [80, 0.01, nh],
+    "brand": [46, bc, bh], "brand-deep": [38, bc * 0.95, bh], "brand-wash": [94, Math.min(bc * 0.28, 0.04), bh],
+    "brand-focus": [46, bc, bh],
+    "ok": [48, 0.11, 160], "warn": [62, 0.14, 75], "danger": [48, 0.17, 27],
+    "sev-critical": sev(27, 54, 0.20, 93.5, 0.03, 42, 0.16),
+    "sev-high":     sev(55, 58, 0.17, 94, 0.035, 44, 0.14),
+    "sev-medium":   sev(85, 62, 0.13, 95, 0.04, 43, 0.10),
+    "sev-low":      sev(240, 58, 0.11, 94, 0.02, 42, 0.09),
+    "sev-info":     sev(250, 62, 0.012, 94.5, 0.008, 43, 0.015)
+  };
+}
+
+function applyTheme() {
+  const root = document.documentElement.style;
+  const tk = computeTokens();
+  const hex = {};
+  for (const name in tk) {
+    const v = tk[name];
+    if (name.startsWith("sev-") && !name.endsWith("-bg") && !name.endsWith("-tx") && !name.endsWith("-bar")) {
+      for (const part of ["bg", "tx", "bar"]) {
+        const [L, C, H] = v[part];
+        root.setProperty("--" + name + "-" + part, "oklch(" + L + "% " + C.toFixed(3) + " " + H + ")");
+        hex[name + "-" + part] = oklchToHex(L, C, H);
+      }
+    } else {
+      const [L, C, H] = v;
+      root.setProperty("--" + name, "oklch(" + L + "% " + C.toFixed(3) + " " + H + ")");
+      hex[name] = oklchToHex(L, C, H);
+    }
+  }
+  root.setProperty("--brand-focus", "oklch(46% " + T.bc.toFixed(3) + " " + T.bh + " / 0.14)");
+  root.setProperty("--radius", T.r + "px");
+  root.setProperty("--radius-lg", (T.r + 2) + "px");
+  const base = { s1: 4, s2: 8, s3: 12, s4: 16, s5: 24, s6: 32 };
+  for (const k in base) root.setProperty("--" + k, Math.round(base[k] * T.d) + "px");
+  root.setProperty("--font-display",
+    T.serif ? '"Noto Serif SC", "Source Han Serif SC", "Songti SC", serif'
+            : '-apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif');
+
+  document.getElementById("vNh").textContent = T.nh < 155 ? "暖" : (T.nh > 200 ? "冷" : "中性");
+  document.getElementById("vBh").textContent = T.bh + "°";
+  document.getElementById("vBc").textContent = (T.bc * 100).toFixed(0) + "%";
+  document.getElementById("vSc").textContent = Math.round(T.sc * 100) + "%";
+  document.getElementById("vR").textContent = T.r + "px";
+  document.getElementById("vD").textContent = Math.round(T.d * 100) + "%";
+  document.getElementById("fSerif").classList.toggle("on", T.serif);
+  document.getElementById("fSans").classList.toggle("on", !T.serif);
+
+  const sw = document.getElementById("tpSwatches");
+  sw.innerHTML = ["brand", "sev-critical-bar", "sev-high-bar", "sev-medium-bar", "sev-low-bar", "sev-info-bar"]
+    .map(k => '<i style="background:' + hex[k] + '" title="' + k + " " + hex[k] + '"></i>').join("");
+  return hex;
+}
+
+["pNh", "pBh", "pBc", "pSc", "pR", "pD"].forEach(id => {
+  document.getElementById(id).addEventListener("input", e => {
+    const v = +e.target.value;
+    if (id === "pNh") T.nh = v;
+    if (id === "pBh") T.bh = v;
+    if (id === "pBc") T.bc = v / 100;
+    if (id === "pSc") T.sc = v / 100;
+    if (id === "pR") T.r = v;
+    if (id === "pD") T.d = v / 100;
+    applyTheme();
+  });
+});
+document.getElementById("fSerif").addEventListener("click", () => { T.serif = true; applyTheme(); });
+document.getElementById("fSans").addEventListener("click", () => { T.serif = false; applyTheme(); });
+document.getElementById("panelFab").addEventListener("click", () => document.getElementById("tokenPanel").classList.toggle("open"));
+document.getElementById("tpClose").addEventListener("click", () => document.getElementById("tokenPanel").classList.remove("open"));
+document.getElementById("tpReset").addEventListener("click", () => {
+  T = Object.assign({}, THEME_DEFAULT);
+  document.getElementById("pNh").value = T.nh;
+  document.getElementById("pBh").value = T.bh;
+  document.getElementById("pBc").value = T.bc * 100;
+  document.getElementById("pSc").value = T.sc * 100;
+  document.getElementById("pR").value = T.r;
+  document.getElementById("pD").value = T.d * 100;
+  applyTheme();
+});
+
+document.getElementById("tpCopy").addEventListener("click", () => {
+  const hex = applyTheme();
+  const text = Object.keys(hex).map(k => k + ": " + hex[k]).join("\n");
+  navigator.clipboard.writeText(text).then(
+    () => toast("令牌已复制（hex 格式）"),
+    () => toast("复制失败，请手动记录")
+  );
+});
+
+document.getElementById("tpQss").addEventListener("click", () => {
+  const H = applyTheme();
+  const titleFont = T.serif ? '"Noto Serif SC", "Source Han Serif SC", "SimSun", serif' : '"PingFang SC", "Microsoft YaHei", sans-serif';
+  const qss = [
+"/* 安服报告工作台 · 设计调节台导出 " + new Date().toLocaleString("zh-CN") + " */",
+"QWidget { font-family: \"PingFang SC\", \"Microsoft YaHei\", sans-serif; font-size: 13px; color: " + H["ink-1"] + "; background: " + H["bg-page"] + "; }",
+"#topbar, QToolBar { background: " + H["bg-surface"] + "; border-bottom: 1px solid " + H["line"] + "; padding: 8px 16px; }",
+"#appTitle, #listTitle, #sectionTitle { font-family: " + titleFont + "; font-weight: bold; }",
+"#appSubtitle, #navLabel, #sideFoot, #listCount, #savedAt, #sectionFields { font-size: 11px; color: " + H["ink-3"] + "; }",
+"QPushButton { background: " + H["bg-surface"] + "; border: 1px solid " + H["line-strong"] + "; border-radius: " + T.r + "px; padding: 6px 14px; font-size: 12px; }",
+"QPushButton:hover:!disabled { background: " + H["bg-sunken"] + "; border-color: " + H["ink-3"] + "; }",
+"QPushButton:disabled { color: " + H["ink-3"] + "; background: " + H["bg-page"] + "; border-color: " + H["line"] + "; }",
+"#primaryBtn { background: " + H["brand"] + "; border: 1px solid " + H["brand"] + "; color: " + H["bg-surface"] + "; }",
+"#primaryBtn:hover:!disabled { background: " + H["brand-deep"] + "; border-color: " + H["brand-deep"] + "; }",
+"#dangerBtn { color: " + H["danger"] + "; }",
+"#ghostBtn { background: transparent; border: 1px solid transparent; color: " + H["ink-2"] + "; }",
+"#ghostBtn:hover:!disabled { background: " + H["bg-sunken"] + "; }",
+"#sidebar { background: " + H["bg-surface"] + "; border-right: 1px solid " + H["line"] + "; min-width: 156px; max-width: 156px; }",
+"#navItem { border: none; border-radius: " + T.r + "px; text-align: left; padding: 8px 10px; color: " + H["ink-2"] + "; background: transparent; }",
+"#navItem:hover { background: " + H["bg-sunken"] + "; color: " + H["ink-1"] + "; }",
+"#navItem[active=\"true\"] { background: " + H["brand-wash"] + "; color: " + H["brand-deep"] + "; font-weight: 500; }",
+"#listPanel { background: " + H["bg-surface"] + "; border-right: 1px solid " + H["line"] + "; min-width: 264px; max-width: 264px; }",
+"VulnItem { background: transparent; border: 1px solid transparent; border-left: 3px solid " + H["line-strong"] + "; border-radius: " + T.r + "px; padding: 8px 10px; }",
+"VulnItem:hover { background: " + H["bg-sunken"] + "; }",
+"VulnItem[selected=\"true\"] { background: " + H["bg-surface"] + "; border-color: " + H["line-strong"] + "; }",
+"VulnItem[severity=\"critical\"] { border-left-color: " + H["sev-critical-bar"] + "; }",
+"VulnItem[severity=\"high\"] { border-left-color: " + H["sev-high-bar"] + "; }",
+"VulnItem[severity=\"medium\"] { border-left-color: " + H["sev-medium-bar"] + "; }",
+"VulnItem[severity=\"low\"] { border-left-color: " + H["sev-low-bar"] + "; }",
+"VulnItem[severity=\"info\"] { border-left-color: " + H["sev-info-bar"] + "; }",
+"#sevBadge { border-radius: " + T.r + "px; padding: 1px 8px; font-size: 11px; }",
+"#sevBadge[severity=\"critical\"] { background: " + H["sev-critical-bg"] + "; color: " + H["sev-critical-tx"] + "; }",
+"#sevBadge[severity=\"high\"] { background: " + H["sev-high-bg"] + "; color: " + H["sev-high-tx"] + "; }",
+"#sevBadge[severity=\"medium\"] { background: " + H["sev-medium-bg"] + "; color: " + H["sev-medium-tx"] + "; }",
+"#sevBadge[severity=\"low\"] { background: " + H["sev-low-bg"] + "; color: " + H["sev-low-tx"] + "; }",
+"#sevBadge[severity=\"info\"] { background: " + H["sev-info-bg"] + "; color: " + H["sev-info-tx"] + "; }",
+"QLineEdit, QPlainTextEdit, QTextEdit { background: " + H["bg-surface"] + "; border: 1px solid " + H["line-strong"] + "; border-radius: " + T.r + "px; padding: 7px 10px; selection-background-color: " + H["brand-wash"] + "; }",
+"QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus { border-color: " + H["brand"] + "; }",
+"QWidget[mono=\"true\"], QPlainTextEdit[mono=\"true\"], QLineEdit[mono=\"true\"] { font-family: \"JetBrains Mono\", \"Consolas\", monospace; font-size: 12px; }",
+"#sectionCard { background: " + H["bg-surface"] + "; border: 1px solid " + H["line"] + "; border-radius: " + (T.r + 2) + "px; }",
+"#sectionToggle { color: " + H["brand"] + "; font-size: 11px; background: transparent; border: none; }",
+"#editorFoot { background: " + H["bg-surface"] + "; border-top: 1px solid " + H["line"] + "; padding: 10px 16px; }",
+"#statusbar { background: " + H["bg-surface"] + "; border-top: 1px solid " + H["line"] + "; font-size: 11px; color: " + H["ink-3"] + "; padding: 4px 16px; }",
+"QScrollBar:vertical { width: 8px; background: transparent; } QScrollBar::handle:vertical { background: " + H["line-strong"] + "; border-radius: 4px; min-height: 30px; }",
+"QScrollBar::handle:vertical:hover { background: " + H["ink-3"] + "; } QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }",
+"QMenu { background: " + H["bg-surface"] + "; border: 1px solid " + H["line"] + "; border-radius: " + T.r + "px; padding: 4px; }",
+"QMenu::item { padding: 6px 20px; border-radius: 6px; } QMenu::item:selected { background: " + H["brand-wash"] + "; color: " + H["brand-deep"] + "; }",
+"QSplitter::handle { background: " + H["line"] + "; }"
+  ].join("\n");
+  const blob = new Blob([qss], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "redesign-theme.qss";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast("QSS 已导出，覆盖项目中的主题文件即可");
+});
+
+applyTheme();
+</script>
+
+<script>
+/* ============ 布局编辑模式：拖宽 / 拖拽排序 / 导出 ============ */
+const LS_KEY = "wb-layout-v1";
+let layoutData = { sidebarW: 156, listW: 264, order: [] };
+try {
+  const saved = JSON.parse(localStorage.getItem(LS_KEY) || "null");
+  if (saved) layoutData = Object.assign(layoutData, saved);
+} catch (e) {}
+
+const scrollEl = document.querySelector(".editor-scroll");
+
+function applyLayout() {
+  const root = document.documentElement.style;
+  root.setProperty("--sidebar-w", layoutData.sidebarW + "px");
+  root.setProperty("--list-w", layoutData.listW + "px");
+  if (layoutData.order.length) {
+    const secs = Array.from(scrollEl.querySelectorAll(".section"));
+    layoutData.order.forEach(title => {
+      const sec = secs.find(s => s.dataset.canvasId === title || s.querySelector("h3").textContent === title);
+      if (sec) scrollEl.appendChild(sec);
+    });
+  }
+}
+function saveLayout() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(layoutData)); } catch (e) {}
+  window.dispatchEvent(new Event("canvas-layout-change"));
+}
+
+/* 拖宽 */
+function bindHandle(id, key, min, max) {
+  const h = document.getElementById(id);
+  h.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    h.classList.add("active");
+    h.setPointerCapture(e.pointerId);
+    const startX = e.clientX, startW = layoutData[key];
+    const move = ev => {
+      layoutData[key] = Math.round(Math.min(max, Math.max(min, startW + ev.clientX - startX)));
+      document.documentElement.style.setProperty("--" + (key === "sidebarW" ? "sidebar-w" : "list-w"), layoutData[key] + "px");
+    };
+    const up = () => {
+      h.classList.remove("active");
+      h.removeEventListener("pointermove", move);
+      h.removeEventListener("pointerup", up);
+      saveLayout();
+    };
+    h.addEventListener("pointermove", move);
+    h.addEventListener("pointerup", up);
+  });
+}
+bindHandle("handleSidebar", "sidebarW", 120, 320);
+bindHandle("handleList", "listW", 200, 460);
+
+/* 分区拖拽排序 */
+let dragSec = null;
+function refreshDraggable() {
+  scrollEl.querySelectorAll(".section").forEach(s => {
+    s.draggable = document.body.classList.contains("layout");
+  });
+}
+scrollEl.addEventListener("dragstart", e => {
+  const sec = e.target.closest(".section");
+  if (!sec || !document.body.classList.contains("layout")) { e.preventDefault(); return; }
+  dragSec = sec;
+  sec.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+});
+scrollEl.addEventListener("dragover", e => {
+  if (!dragSec) return;
+  e.preventDefault();
+  const sec = e.target.closest(".section");
+  scrollEl.querySelectorAll(".drop-before").forEach(x => x.classList.remove("drop-before"));
+  if (sec && sec !== dragSec) sec.classList.add("drop-before");
+});
+scrollEl.addEventListener("drop", e => {
+  if (!dragSec) return;
+  e.preventDefault();
+  const sec = e.target.closest(".section");
+  if (sec && sec !== dragSec) scrollEl.insertBefore(dragSec, sec);
+  finishDrag();
+});
+scrollEl.addEventListener("dragend", finishDrag);
+function finishDrag() {
+  scrollEl.querySelectorAll(".drop-before").forEach(x => x.classList.remove("drop-before"));
+  if (dragSec) dragSec.classList.remove("dragging");
+  dragSec = null;
+  layoutData.order = Array.from(scrollEl.querySelectorAll(".section")).map(s => s.dataset.canvasId || s.querySelector("h3").textContent);
+  saveLayout();
+}
+
+/* 模式开关与工具条 */
+const layoutFab = document.getElementById("layoutFab");
+layoutFab.addEventListener("click", () => {
+  document.body.classList.add("layout");
+  refreshDraggable();
+  toast("布局模式已开启：拖边框改宽度，拖分区改顺序");
+});
+document.getElementById("lbDone").addEventListener("click", () => {
+  document.body.classList.remove("layout");
+  refreshDraggable();
+  saveLayout();
+  toast("布局已保存，刷新后仍生效");
+});
+document.getElementById("lbReset").addEventListener("click", () => {
+  try { localStorage.removeItem(LS_KEY); } catch (e) {}
+  window.dispatchEvent(new Event("canvas-layout-reset"));
+  location.reload();
+});
+document.getElementById("lbExport").addEventListener("click", () => {
+  const cfg = {
+    sidebarWidth: layoutData.sidebarW,
+    listPanelWidth: layoutData.listW,
+    sectionOrder: layoutData.order,
+    note: "安服报告工作台布局配置 · 对应 QSplitter 宽度与 QVBoxLayout 分区顺序",
+    exportedAt: new Date().toLocaleString("zh-CN")
+  };
+  const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: "application/json;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "layout-config.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast("布局配置已导出");
+});
+
+applyLayout();
+</script>
+<script>
+/* ============ 自由编辑画布：点选、样式、保存与导出 ============ */
+const canvasRoot = document.querySelector(".app");
+const canvasPanel = document.getElementById("canvasPanel");
+const canvasStatus = document.getElementById("canvasStatus");
+const canvasTextInput = document.getElementById("canvasText");
+const canvasCssInput = document.getElementById("canvasCss");
+const canvasStorageKey = "anfu-ui-canvas-v1:" + location.pathname;
+const canvasElements = new Map();
+const canvasDefaults = new Map();
+let canvasNodeChanges = Object.create(null);
+let canvasSelected = null;
+let canvasInline = null;
+let canvasInlineBefore = "";
+
+function canvasPath(element, root) {
+  const parts = [];
+  for (let node = element; node !== root; node = node.parentElement) {
+    if (!node || !node.parentElement) break;
+    parts.unshift(node.tagName.toLowerCase() + ":" + Array.from(node.parentElement.children).indexOf(node));
+  }
+  return parts.join("/");
+}
+
+function canvasTextKind(element) {
+  if (element.matches("textarea, input[type='text']")) return "placeholder";
+  if (element.children.length || !element.textContent.trim()) return null;
+  if (!element.matches("h1, h2, h3, p, span, label, button, a, .nav-label, .side-foot")) return null;
+  if (element.matches(".toggle, .count, .save-state, #editTitle, #editMeta, #savedAt, #statusMsg")) return null;
+  return "text";
+}
+
+canvasRoot.querySelectorAll("*").forEach(element => {
+  const dynamic = element.parentElement.closest("#vulnList, #chips, #sevSeg");
+  if (dynamic) return;
+  let key = element.dataset.canvasId;
+  if (!key) {
+    const section = element.closest(".section");
+    if (section) {
+      const sectionKey = section.dataset.canvasId || "section:" + section.querySelector("h3").textContent.trim();
+      key = element === section ? sectionKey : sectionKey + "/" + canvasPath(element, section);
+    } else {
+      key = "app/" + canvasPath(element, canvasRoot);
+    }
+    element.dataset.canvasId = key;
+  }
+  canvasElements.set(key, element);
+  const kind = canvasTextKind(element);
+  canvasDefaults.set(key, {
+    kind,
+    text: kind === "text" ? element.textContent : null,
+    placeholder: kind === "placeholder" ? element.getAttribute("placeholder") || "" : null,
+    style: element.getAttribute("style") || ""
+  });
+});
+
+function canvasSnapshot() {
+  return {
+    version: 1,
+    theme: Object.assign({}, T),
+    layout: { sidebarW: layoutData.sidebarW, listW: layoutData.listW, order: [...layoutData.order] },
+    nodes: canvasNodeChanges
+  };
+}
+
+function canvasPersist() {
+  try {
+    localStorage.setItem(canvasStorageKey, JSON.stringify(canvasSnapshot()));
+    canvasStatus.textContent = "已自动保存到当前浏览器。可导出 HTML 或 JSON 继续编辑。";
+  } catch (error) {
+    canvasStatus.textContent = "当前浏览器未开放本地存储，请导出 HTML 或 JSON 保存设计。";
+  }
+}
+
+function canvasResetNode(element) {
+  const original = canvasDefaults.get(element.dataset.canvasId);
+  if (!original) return;
+  if (original.style) element.setAttribute("style", original.style);
+  else element.removeAttribute("style");
+  if (original.kind === "text") element.textContent = original.text;
+  if (original.kind === "placeholder") element.setAttribute("placeholder", original.placeholder);
+}
+
+function canvasSyncThemeInputs() {
+  const values = { pNh: T.nh, pBh: T.bh, pBc: T.bc * 100, pSc: T.sc * 100, pR: T.r, pD: T.d * 100 };
+  Object.entries(values).forEach(([id, value]) => { document.getElementById(id).value = value; });
+  applyTheme();
+}
+
+function canvasApply(config) {
+  if (config.theme && typeof config.theme === "object") {
+    Object.assign(T, THEME_DEFAULT, config.theme);
+    canvasSyncThemeInputs();
+  }
+  if (config.layout && typeof config.layout === "object") {
+    Object.assign(layoutData, config.layout);
+    applyLayout();
+    try { localStorage.setItem(LS_KEY, JSON.stringify(layoutData)); } catch (error) {}
+  }
+  canvasElements.forEach(canvasResetNode);
+  canvasNodeChanges = Object.assign(Object.create(null), config.nodes || {});
+  Object.entries(canvasNodeChanges).forEach(([key, change]) => {
+    const element = canvasElements.get(key);
+    const original = canvasDefaults.get(key);
+    if (!element || !original || !change || typeof change !== "object") return;
+    if (typeof change.style === "string") {
+      if (change.style) element.setAttribute("style", change.style);
+      else element.removeAttribute("style");
+    }
+    if (original.kind === "text" && typeof change.text === "string") element.textContent = change.text;
+    if (original.kind === "placeholder" && typeof change.placeholder === "string") {
+      element.setAttribute("placeholder", change.placeholder);
+    }
+  });
+  canvasSyncSelection();
+}
+
+function canvasLoad() {
+  let seed = {};
+  let saved = null;
+  try { seed = JSON.parse(document.getElementById("canvasSeed").textContent || "{}"); } catch (error) {}
+  try { saved = JSON.parse(localStorage.getItem(canvasStorageKey) || "null"); } catch (error) {}
+  canvasApply(saved || seed);
+}
+
+function canvasSaveNode(element) {
+  const key = element.dataset.canvasId;
+  const original = canvasDefaults.get(key);
+  if (!original) return;
+  const change = {};
+  const currentStyle = element.getAttribute("style") || "";
+  if (currentStyle !== original.style) change.style = currentStyle;
+  if (original.kind === "text" && element.textContent !== original.text) change.text = element.textContent;
+  if (original.kind === "placeholder" && element.getAttribute("placeholder") !== original.placeholder) {
+    change.placeholder = element.getAttribute("placeholder") || "";
+  }
+  if (Object.keys(change).length) canvasNodeChanges[key] = change;
+  else delete canvasNodeChanges[key];
+  canvasPersist();
+}
+
+function canvasSyncSelection() {
+  const selected = canvasSelected;
+  const original = selected ? canvasDefaults.get(selected.dataset.canvasId) : null;
+  const description = document.getElementById("canvasSelection");
+  description.textContent = selected
+    ? selected.tagName.toLowerCase() + (selected.id ? " #" + selected.id : "") + " · " + selected.textContent.trim().slice(0, 30)
+    : "选择页面上的一个元素";
+  canvasTextInput.disabled = !selected || !original.kind;
+  canvasTextInput.value = !selected || !original.kind ? "" : original.kind === "placeholder"
+    ? selected.getAttribute("placeholder") || "" : selected.textContent;
+  document.querySelectorAll("#canvasPanel [data-css-prop]").forEach(input => {
+    input.disabled = !selected;
+    if (!selected) { input.value = ""; return; }
+    const value = selected.style.getPropertyValue(input.dataset.cssProp).trim();
+    input.value = input.type === "number" ? (value.match(/^-?\d+(?:\.\d+)?px$/) ? parseFloat(value) : "") : value;
+  });
+  canvasCssInput.disabled = !selected;
+  canvasCssInput.value = selected ? selected.getAttribute("style") || "" : "";
+  document.getElementById("canvasApplyCss").disabled = !selected;
+  document.getElementById("canvasResetOne").disabled = !selected;
+}
+
+function canvasSelect(element) {
+  if (canvasSelected) canvasSelected.classList.remove("canvas-selected");
+  canvasSelected = element;
+  if (element) element.classList.add("canvas-selected");
+  canvasSyncSelection();
+}
+
+function canvasEndInline() {
+  if (!canvasInline) return;
+  const element = canvasInline;
+  canvasInline = null;
+  element.removeAttribute("contenteditable");
+  canvasSaveNode(element);
+  canvasSyncSelection();
+}
+
+function canvasStartInline(element) {
+  if (canvasTextKind(element) !== "text") return;
+  canvasSelect(element);
+  canvasInline = element;
+  canvasInlineBefore = element.textContent;
+  element.setAttribute("contenteditable", "true");
+  element.focus();
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+  element.addEventListener("blur", canvasEndInline, { once: true });
+}
+
+function canvasOpen() {
+  document.body.classList.remove("layout");
+  refreshDraggable();
+  document.getElementById("tokenPanel").classList.remove("open");
+  document.body.classList.add("canvas-mode");
+  canvasPanel.classList.add("open");
+  canvasSyncSelection();
+}
+
+function canvasClose() {
+  canvasEndInline();
+  document.body.classList.remove("canvas-mode");
+  canvasPanel.classList.remove("open");
+  canvasSelect(null);
+  canvasPersist();
+}
+
+canvasRoot.addEventListener("click", event => {
+  if (!document.body.classList.contains("canvas-mode")) return;
+  if (canvasInline && canvasInline.contains(event.target)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (canvasInline) canvasEndInline();
+  canvasSelect(event.target.closest("[data-canvas-id]"));
+}, true);
+canvasRoot.addEventListener("dblclick", event => {
+  if (!document.body.classList.contains("canvas-mode")) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const element = event.target.closest("[data-canvas-id]");
+  if (element) canvasStartInline(element);
+}, true);
+document.addEventListener("keydown", event => {
+  if (canvasInline && event.key === "Escape") {
+    canvasInline.textContent = canvasInlineBefore;
+    canvasInline.blur();
+  } else if (canvasInline && event.key === "Enter") {
+    event.preventDefault();
+    canvasInline.blur();
+  } else if (event.key === "Escape" && document.body.classList.contains("canvas-mode")) {
+    canvasClose();
+  }
+});
+
+document.getElementById("canvasFab").addEventListener("click", () => {
+  if (document.body.classList.contains("canvas-mode")) canvasClose();
+  else canvasOpen();
+});
+document.getElementById("canvasDone").addEventListener("click", canvasClose);
+document.getElementById("layoutFab").addEventListener("click", canvasClose);
+document.getElementById("panelFab").addEventListener("click", canvasClose);
+
+canvasTextInput.addEventListener("input", () => {
+  if (!canvasSelected) return;
+  const kind = canvasDefaults.get(canvasSelected.dataset.canvasId).kind;
+  if (kind === "text") canvasSelected.textContent = canvasTextInput.value;
+  if (kind === "placeholder") canvasSelected.setAttribute("placeholder", canvasTextInput.value);
+  canvasSaveNode(canvasSelected);
+});
+document.querySelectorAll("#canvasPanel [data-css-prop]").forEach(input => {
+  input.addEventListener("input", () => {
+    if (!canvasSelected) return;
+    const value = input.value.trim();
+    const property = input.dataset.cssProp;
+    if (!value) canvasSelected.style.removeProperty(property);
+    else if (input.type === "number") canvasSelected.style.setProperty(property, value + "px");
+    else if (CSS.supports(property, value)) canvasSelected.style.setProperty(property, value);
+    canvasCssInput.value = canvasSelected.getAttribute("style") || "";
+    canvasSaveNode(canvasSelected);
+  });
+});
+document.getElementById("canvasApplyCss").addEventListener("click", () => {
+  if (!canvasSelected) return;
+  canvasSelected.style.cssText = canvasCssInput.value;
+  canvasSaveNode(canvasSelected);
+  canvasSyncSelection();
+});
+document.getElementById("canvasResetOne").addEventListener("click", () => {
+  if (!canvasSelected) return;
+  const key = canvasSelected.dataset.canvasId;
+  canvasResetNode(canvasSelected);
+  delete canvasNodeChanges[key];
+  canvasPersist();
+  canvasSyncSelection();
+  toast("已还原选中元素");
+});
+
+function canvasDownload(filename, content, type) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+document.getElementById("canvasExportJson").addEventListener("click", () => {
+  canvasDownload("ui-design-canvas.json", JSON.stringify(canvasSnapshot(), null, 2), "application/json;charset=utf-8");
+  toast("设计 JSON 已导出");
+});
+document.getElementById("canvasExportHtml").addEventListener("click", () => {
+  canvasEndInline();
+  const copy = document.documentElement.cloneNode(true);
+  copy.querySelector("body").classList.remove("canvas-mode", "layout");
+  copy.querySelector("#canvasPanel").classList.remove("open");
+  copy.querySelector("#tokenPanel").classList.remove("open");
+  copy.querySelectorAll(".canvas-selected").forEach(element => element.classList.remove("canvas-selected"));
+  copy.querySelectorAll("[contenteditable]").forEach(element => element.removeAttribute("contenteditable"));
+  copy.querySelector("#canvasSeed").textContent = JSON.stringify(canvasSnapshot()).replace(/</g, "\\u003c");
+  canvasDownload("ui-design-canvas-edited.html", "<!DOCTYPE html>\n" + copy.outerHTML, "text/html;charset=utf-8");
+  toast("可编辑 HTML 已导出");
+});
+document.getElementById("canvasImportBtn").addEventListener("click", () => document.getElementById("canvasImport").click());
+document.getElementById("canvasImport").addEventListener("change", async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+  try {
+    const config = JSON.parse(await file.text());
+    if (config.version !== 1 || !config.nodes || !config.theme || !config.layout) throw new Error("invalid design");
+    canvasApply(config);
+    canvasPersist();
+    toast("设计已导入");
+  } catch (error) {
+    toast("不是有效的画布设计 JSON");
+  }
+  event.target.value = "";
+});
+document.getElementById("canvasResetAll").addEventListener("click", () => {
+  try { localStorage.removeItem(canvasStorageKey); localStorage.removeItem(LS_KEY); } catch (error) {}
+  location.reload();
+});
+document.getElementById("tokenPanel").addEventListener("input", canvasPersist);
+document.getElementById("tokenPanel").addEventListener("click", () => queueMicrotask(canvasPersist));
+window.addEventListener("canvas-layout-change", canvasPersist);
+window.addEventListener("canvas-layout-reset", () => {
+  layoutData = { sidebarW: 156, listW: 264, order: [] };
+  canvasPersist();
+});
+
+canvasLoad();
+canvasSyncSelection();
+</script>
+</body>
+</html>
