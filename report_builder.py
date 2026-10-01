@@ -305,10 +305,12 @@ class ReportBuilder:
             self.document.add_paragraph()
 
         now = datetime.datetime.now()
+        date_digits = f"{now.year:04d}{now.month:02d}{now.day:02d}"
+        date_label = f"{now.year:04d}年{now.month:02d}月{now.day:02d}日"
         info_lines = [
-            f'报告编号：PT-{now.strftime("%Y%m%d")}-001',
-            f'测试日期：{now.strftime("%Y年%m月%d日")}',
-            f'报告日期：{now.strftime("%Y年%m月%d日")}',
+            f"报告编号：PT-{date_digits}-001",
+            f"测试日期：{date_label}",
+            f"报告日期：{date_label}",
             "密级：内部",
         ]
         for line in info_lines:

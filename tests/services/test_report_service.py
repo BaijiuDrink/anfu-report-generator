@@ -1,9 +1,40 @@
+import datetime
+from types import SimpleNamespace
+
 from docx import Document
 from docx.oxml.ns import qn
 from PIL import Image
 import pytest
 
 from services.report_service import ReportService, ReportValidationError
+
+
+def test_cover_date_does_not_depend_on_locale_encoding(monkeypatch):
+    import report_builder
+
+    class AsciiOnlyDate:
+        year = 2026
+        month = 10
+        day = 1
+
+        def strftime(self, pattern):
+            pattern.encode("ascii")
+            return datetime.datetime(self.year, self.month, self.day).strftime(pattern)
+
+    class FixedClock:
+        @staticmethod
+        def now():
+            return AsciiOnlyDate()
+
+    monkeypatch.setattr(
+        report_builder, "datetime", SimpleNamespace(datetime=FixedClock)
+    )
+    document = report_builder.ReportBuilder("示例项目").document
+    text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+
+    assert "报告编号：PT-20261001-001" in text
+    assert "测试日期：2026年10月01日" in text
+    assert "报告日期：2026年10月01日" in text
 
 
 def test_empty_findings_are_rejected():
