@@ -59,10 +59,13 @@ jobs:
               }
             }
           }
+      - name: Name Windows release asset
+        shell: pwsh
+        run: Copy-Item -LiteralPath "dist/安服报告生成工具.exe" -Destination "dist/anfu-report-generator-windows-x86_64.exe"
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x86_64
-          path: dist/安服报告生成工具.exe
+          path: dist/anfu-report-generator-windows-x86_64.exe
           if-no-files-found: error
 
   linux:

@@ -17,7 +17,7 @@
 
 普通用户无需安装 Python，可从 [GitHub Releases](https://github.com/BaijiuDrink/anfu-report-generator/releases) 下载对应平台文件：
 
-- Windows 10/11 x86_64：`安服报告生成工具.exe`
+- Windows 10/11 x86_64：`anfu-report-generator-windows-x86_64.exe`
 - Ubuntu、Debian、Kali、Fedora 等主流 Linux x86_64：`anfu-report-generator-x86_64.AppImage`
 - 无法使用 AppImage/FUSE 时：`anfu-report-generator-linux-x86_64.tar.gz`
 
