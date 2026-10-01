@@ -15,7 +15,7 @@
 
 ## 直接下载运行
 
-普通用户无需安装 Python，可从 GitHub Releases 下载对应平台文件：
+普通用户无需安装 Python，可从 [GitHub Releases](https://github.com/BaijiuDrink/anfu-report-generator/releases) 下载对应平台文件：
 
 - Windows 10/11 x86_64：`安服报告生成工具.exe`
 - Ubuntu、Debian、Kali、Fedora 等主流 Linux x86_64：`anfu-report-generator-x86_64.AppImage`
@@ -85,4 +85,4 @@ Windows 生成文件位于 `dist/安服报告生成工具.exe`。Linux 在对应
 
 ## License
 
-MIT
+本项目采用 [MIT License](LICENSE)。MIT 是许可证名称，不是对项目所属机构的说明。
